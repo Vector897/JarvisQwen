@@ -14,11 +14,16 @@ const PROVIDER_LABEL: Record<string, string> = {
 };
 
 export default function Settings() {
+  const [me, setMe] = useState<{ role: string } | null>(null);
+  useEffect(() => { api("/api/auth/me").then(setMe).catch(() => {}); }, []);
+
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold">设置</h1>
       <KeysSection />
       <GeneralSection />
+      <NotifySection />
+      <ZoteroSection />
+      {me?.role === "admin" && <UsersSection />}
       <PasswordSection />
     </div>
   );
@@ -119,13 +124,12 @@ function KeysSection() {
 // ---------- 业务设置 ----------
 function GeneralSection() {
   const [s, setS] = useState<any>(null);
-  const [msg, setMsg] = useState("");
+  const toast = useToast();
 
   useEffect(() => { api("/api/settings").then(setS).catch(() => {}); }, []);
   if (!s) return null;
 
   async function save() {
-    setMsg("");
     try {
       await put("/api/settings", {
         values: {
@@ -137,10 +141,12 @@ function GeneralSection() {
           research_profile: s.research_profile,
           relevance_threshold: Number(s.relevance_threshold),
           briefing_hour: Number(s.briefing_hour),
+          cascade_enabled: !!s.cascade_enabled,
+          cascade_confidence_threshold: Number(s.cascade_confidence_threshold),
         },
       });
-      setMsg("已保存，立即生效");
-    } catch (err: any) { setMsg(err.message); }
+      toast("已保存，立即生效", "success");
+    } catch (err: any) { toast(err.message, "error"); }
   }
 
   const set = (k: string) => (e: any) =>
@@ -190,10 +196,217 @@ function GeneralSection() {
         </div>
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={!!s.cache_enabled} onChange={set("cache_enabled")} />
-          启用语义缓存（相同请求直接复用历史结果，省钱）
+          启用语义缓存（相同/相近请求直接复用历史结果，省钱）
         </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={!!s.cascade_enabled} onChange={set("cascade_enabled")} />
+          启用模型级联（跨库问答等场景先用轻量层回答，置信度不足才升级前沿层）
+        </label>
+        {s.cascade_enabled && (
+          <label className="block max-w-xs">
+            <span className="mb-1 block font-medium">级联置信度阈值（0-1，越低越少升级）</span>
+            <input className="input" type="number" step="0.05" min="0" max="1"
+              value={s.cascade_confidence_threshold} onChange={set("cascade_confidence_threshold")} />
+          </label>
+        )}
         <button className="btn-primary" onClick={save}>保存设置</button>
-        {msg && <p className="text-slate-600">{msg}</p>}
+      </div>
+    </section>
+  );
+}
+
+// ---------- 推送通知 ----------
+function NotifySection() {
+  const [s, setS] = useState<any>(null);
+  const toast = useToast();
+
+  const load = () => api("/api/settings").then(setS).catch(() => {});
+  useEffect(() => { load(); }, []);
+  if (!s) return null;
+
+  async function save() {
+    try {
+      const values: Record<string, any> = {
+        notify_telegram_enabled: !!s.notify_telegram_enabled,
+        telegram_chat_id: s.telegram_chat_id,
+        notify_email_enabled: !!s.notify_email_enabled,
+        smtp_host: s.smtp_host, smtp_port: Number(s.smtp_port || 587),
+        smtp_user: s.smtp_user, smtp_from: s.smtp_from, smtp_to: s.smtp_to,
+        notify_on_budget_cutoff: !!s.notify_on_budget_cutoff,
+      };
+      // 密钥字段：留空则不提交（后端也会兜底跳过空值，双重保险）
+      if (s.telegram_bot_token) values.telegram_bot_token = s.telegram_bot_token;
+      if (s.smtp_password) values.smtp_password = s.smtp_password;
+      await put("/api/settings", { values });
+      toast("推送设置已保存", "success");
+      load();
+    } catch (err: any) { toast(err.message, "error"); }
+  }
+
+  async function testNotify() {
+    try {
+      const r = await post("/api/settings/test-notify", {});
+      toast(r.results.join("；"), "info");
+    } catch (err: any) { toast(err.message, "error"); }
+  }
+
+  const set = (k: string) => (e: any) =>
+    setS({ ...s, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-lg font-semibold">推送通知</h2>
+      <p className="text-sm text-slate-500">简报生成、预算熔断时推送到 Telegram 或邮箱，离开网页也能收到。</p>
+      <div className="card space-y-4 text-sm">
+        <label className="flex items-center gap-2 font-medium">
+          <input type="checkbox" checked={!!s.notify_telegram_enabled} onChange={set("notify_telegram_enabled")} />
+          启用 Telegram 推送
+        </label>
+        {s.notify_telegram_enabled && (
+          <div className="grid gap-3 pl-6 md:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-xs text-slate-500">Bot Token（找 @BotFather 申请）</span>
+              <input className="input font-mono" placeholder={s.telegram_bot_token_is_set ? "已配置，留空保持不变" : ""}
+                value={s.telegram_bot_token || ""} onChange={set("telegram_bot_token")} />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs text-slate-500">Chat ID</span>
+              <input className="input font-mono" value={s.telegram_chat_id || ""} onChange={set("telegram_chat_id")} />
+            </label>
+          </div>
+        )}
+        <label className="flex items-center gap-2 font-medium">
+          <input type="checkbox" checked={!!s.notify_email_enabled} onChange={set("notify_email_enabled")} />
+          启用邮件推送（SMTP）
+        </label>
+        {s.notify_email_enabled && (
+          <div className="grid gap-3 pl-6 md:grid-cols-2">
+            <input className="input" placeholder="SMTP 服务器，如 smtp.gmail.com" value={s.smtp_host || ""} onChange={set("smtp_host")} />
+            <input className="input" type="number" placeholder="端口（587）" value={s.smtp_port || 587} onChange={set("smtp_port")} />
+            <input className="input" placeholder="用户名" value={s.smtp_user || ""} onChange={set("smtp_user")} />
+            <input className="input" type="password" placeholder={s.smtp_password_is_set ? "已配置，留空保持不变" : "密码/App Password"}
+              value={s.smtp_password || ""} onChange={set("smtp_password")} />
+            <input className="input" placeholder="发件地址" value={s.smtp_from || ""} onChange={set("smtp_from")} />
+            <input className="input" placeholder="收件地址" value={s.smtp_to || ""} onChange={set("smtp_to")} />
+          </div>
+        )}
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={!!s.notify_on_budget_cutoff} onChange={set("notify_on_budget_cutoff")} />
+          预算熔断时也推送（强烈建议开启，避免任务静默挂起没人知道）
+        </label>
+        <div className="flex gap-2">
+          <button className="btn-primary" onClick={save}>保存</button>
+          <button className="btn-ghost" onClick={testNotify}>发送测试推送</button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ---------- Zotero 同步 ----------
+function ZoteroSection() {
+  const [s, setS] = useState<any>(null);
+  const toast = useToast();
+  useEffect(() => { api("/api/settings").then(setS).catch(() => {}); }, []);
+  if (!s) return null;
+
+  async function save() {
+    try {
+      const values: Record<string, any> = {
+        zotero_library_id: s.zotero_library_id, zotero_library_type: s.zotero_library_type,
+      };
+      if (s.zotero_api_key) values.zotero_api_key = s.zotero_api_key;
+      await put("/api/settings", { values });
+      toast("Zotero 配置已保存", "success");
+    } catch (err: any) { toast(err.message, "error"); }
+  }
+
+  const set = (k: string) => (e: any) => setS({ ...s, [k]: e.target.value });
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-lg font-semibold">Zotero 同步</h2>
+      <p className="text-sm text-slate-500">
+        单向推送：在知识库页把归档论文一键推入你的 Zotero 文献库。API Key 在 Zotero 设置 → Security 里生成。
+      </p>
+      <div className="card grid gap-3 text-sm md:grid-cols-2">
+        <label className="block">
+          <span className="mb-1 block text-xs text-slate-500">Zotero API Key</span>
+          <input className="input font-mono" placeholder={s.zotero_api_key_is_set ? "已配置，留空保持不变" : ""}
+            value={s.zotero_api_key || ""} onChange={set("zotero_api_key")} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs text-slate-500">Library ID</span>
+          <input className="input font-mono" value={s.zotero_library_id || ""} onChange={set("zotero_library_id")} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs text-slate-500">Library 类型</span>
+          <select className="input" value={s.zotero_library_type || "user"} onChange={set("zotero_library_type")}>
+            <option value="user">个人库（user）</option>
+            <option value="group">团队库（group）</option>
+          </select>
+        </label>
+        <div className="flex items-end">
+          <button className="btn-primary" onClick={save}>保存</button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ---------- 用户管理（管理员）----------
+function UsersSection() {
+  const [users, setUsers] = useState<any[]>([]);
+  const [name, setName] = useState("");
+  const [role, setRole] = useState("member");
+  const toast = useToast();
+
+  const load = () => api("/api/users").then(setUsers).catch(() => {});
+  useEffect(() => { load(); }, []);
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    try {
+      const r = await post("/api/users", { name, role });
+      toast(`已创建 ${r.name}，临时密码：${r.temp_password}（请截图告知对方）`, "success");
+      setName("");
+      load();
+    } catch (err: any) { toast(err.message, "error"); }
+  }
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-lg font-semibold">用户管理（管理员）</h2>
+      <form onSubmit={create} className="card flex flex-col gap-2 md:flex-row">
+        <input className="input flex-1" placeholder="用户名" value={name} onChange={(e) => setName(e.target.value)} />
+        <select className="input md:w-40" value={role} onChange={(e) => setRole(e.target.value)}>
+          <option value="member">member（可下任务）</option>
+          <option value="viewer">viewer（只读）</option>
+          <option value="admin">admin（全权限）</option>
+        </select>
+        <button className="btn-primary justify-center">创建账号</button>
+      </form>
+      <div className="space-y-2">
+        {users.map((u) => (
+          <div key={u.id} className="card flex items-center justify-between text-sm">
+            <span className="font-medium">{u.name}</span>
+            <div className="flex items-center gap-2">
+              <select className="input w-36" value={u.role}
+                onChange={(e) => put(`/api/users/${u.id}/role`, { role: e.target.value })
+                  .then(() => { toast("角色已更新", "success"); load(); })
+                  .catch((err) => toast(err.message, "error"))}>
+                <option value="member">member</option>
+                <option value="viewer">viewer</option>
+                <option value="admin">admin</option>
+              </select>
+              <button className="btn-ghost text-xs text-red-600"
+                onClick={() => del(`/api/users/${u.id}`).then(() => { toast("已删除用户", "info"); load(); })}>
+                删除
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -203,14 +416,14 @@ function GeneralSection() {
 function PasswordSection() {
   const [oldPw, setOldPw] = useState("");
   const [newPw, setNewPw] = useState("");
-  const [msg, setMsg] = useState("");
+  const toast = useToast();
 
   async function change(e: React.FormEvent) {
     e.preventDefault();
     try {
       await post("/api/auth/change-password", { old_password: oldPw, new_password: newPw });
-      setMsg("密码已修改"); setOldPw(""); setNewPw("");
-    } catch (err: any) { setMsg(err.message); }
+      toast("密码已修改", "success"); setOldPw(""); setNewPw("");
+    } catch (err: any) { toast(err.message, "error"); }
   }
 
   return (
@@ -223,7 +436,6 @@ function PasswordSection() {
           onChange={(e) => setNewPw(e.target.value)} />
         <button className="btn-primary justify-center">修改密码</button>
       </form>
-      {msg && <p className="text-sm text-slate-600">{msg}</p>}
     </section>
   );
 }

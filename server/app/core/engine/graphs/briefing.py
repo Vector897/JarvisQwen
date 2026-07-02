@@ -5,6 +5,7 @@ import time
 
 from sqlalchemy import select
 
+from ....connectors.notify import notify_all
 from ....models import Briefing, Paper, Summary
 from ...bus import bus
 from ...router import llm, policy
@@ -48,6 +49,7 @@ def step_save(ctx: TaskContext, state: dict) -> dict:
     date = time.strftime("%Y-%m-%d")
     ctx.db.add(Briefing(date=date, content_md=state["briefing_md"], owner_id=ctx.task.owner_id))
     bus.publish("briefing_ready", {"date": date, "task_id": ctx.task.id})
+    notify_all(ctx.db, f"AAOS 简报 {date}", state["briefing_md"][:3500])
     ctx.artifact("简报", state["briefing_md"][:2000])
     return state
 

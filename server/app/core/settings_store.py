@@ -25,6 +25,31 @@ DEFAULTS: dict[str, Any] = {
     "max_retries": 3,
     "relevance_threshold": 0.5,  # 论文初筛相关度阈值
     "research_profile": "",  # 用户研究方向描述，用于初筛与总结的上下文
+    "cascade_enabled": True,
+    "cascade_confidence_threshold": 0.6,
+    # 推送通知
+    "notify_telegram_enabled": False,
+    "telegram_bot_token": "",
+    "telegram_chat_id": "",
+    "notify_email_enabled": False,
+    "smtp_host": "",
+    "smtp_port": 587,
+    "smtp_user": "",
+    "smtp_password": "",
+    "smtp_from": "",
+    "smtp_to": "",
+    "notify_on_budget_cutoff": True,
+    # Zotero 同步
+    "zotero_api_key": "",
+    "zotero_library_id": "",
+    "zotero_library_type": "user",
+    # 界面
+    "ui_theme": "light",  # light/dark（也存一份在 localStorage，这里做跨设备记忆）
+    "ui_lang": "zh",  # zh/en
+}
+
+SECRET_KEYS = {  # 这些 key 在 GET /api/settings 中掩码返回，避免明文泄露给前端
+    "telegram_bot_token", "smtp_password", "zotero_api_key",
 }
 
 
@@ -43,11 +68,17 @@ def set_setting(db: Session, key: str, value: Any) -> None:
         row.value_json = json.dumps(value, ensure_ascii=False)
 
 
-def all_settings(db: Session) -> dict[str, Any]:
+def all_settings(db: Session, mask_secrets: bool = False) -> dict[str, Any]:
     merged = dict(DEFAULTS)
     for row in db.execute(select(Setting)).scalars():
         try:
             merged[row.key] = json.loads(row.value_json)
         except json.JSONDecodeError:
             pass
+    if mask_secrets:
+        # 密钥字段不回显明文：置空 + 附带 "<key>_is_set" 布尔位。
+        # 前端：字段留空提交 = 不改动既有密钥（PUT 时跳过空的 secret 字段）。
+        for key in SECRET_KEYS:
+            merged[f"{key}_is_set"] = bool(merged.get(key))
+            merged[key] = ""
     return merged

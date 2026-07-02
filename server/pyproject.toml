@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 pdf = ["pymupdf>=1.24"]
+export-pdf = ["reportlab>=4.0"]
 dev = ["pytest>=8", "pytest-asyncio", "ruff", "mypy"]
 
 [build-system]

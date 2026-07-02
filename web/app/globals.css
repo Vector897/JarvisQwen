@@ -3,23 +3,23 @@
 @tailwind utilities;
 
 body {
-  @apply bg-slate-50 text-slate-900;
+  @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors;
 }
 
 .card {
-  @apply bg-white rounded-xl border border-slate-200 shadow-sm p-4;
+  @apply bg-white rounded-xl border border-slate-200 shadow-sm p-4 dark:bg-slate-900 dark:border-slate-800;
 }
 .btn {
   @apply inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
 }
 .btn-primary {
-  @apply btn bg-slate-900 text-white hover:bg-slate-700;
+  @apply btn bg-slate-900 text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white;
 }
 .btn-ghost {
-  @apply btn bg-slate-100 hover:bg-slate-200;
+  @apply btn bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700;
 }
 .input {
-  @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 transition-shadow;
+  @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 transition-shadow dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:focus:ring-slate-600;
 }
 .badge {
   @apply inline-block rounded-full px-2 py-0.5 text-xs font-medium;
@@ -27,7 +27,7 @@ body {
 
 /* 卡片链接 hover 微交互 */
 .card-link {
-  @apply card block transition-all hover:border-slate-400 hover:shadow-md active:scale-[0.99];
+  @apply card block transition-all hover:border-slate-400 hover:shadow-md active:scale-[0.99] dark:hover:border-slate-600;
 }
 
 /* Toast 滑入动画 */
@@ -41,10 +41,32 @@ body {
 
 /* 骨架屏 */
 .skeleton {
-  @apply animate-pulse rounded-lg bg-slate-200;
+  @apply animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800;
 }
 
 /* 进度条通用过渡 */
 .progress-bar {
   @apply h-full transition-all duration-500 ease-out;
+}
+
+/* 深色模式兜底：页面里大量直接写死的 text-slate-900/700 在浅色下是标题/正文色，
+   在深色背景下会失去对比度。用属性选择器统一收编，不必逐页面加 dark: 前缀。 */
+.dark [class*="text-slate-900"],
+.dark [class*="text-slate-800"],
+.dark [class*="text-slate-700"] {
+  color: rgb(226 232 240); /* slate-200 */
+}
+.dark [class*="text-slate-600"] {
+  color: rgb(203 213 225); /* slate-300 */
+}
+.dark [class*="bg-slate-50"]:not(.card):not(body) {
+  background-color: rgb(30 41 59); /* slate-800，如任务列表内嵌浅底块 */
+}
+.dark [class*="bg-slate-100"]:not(.btn-ghost) {
+  background-color: rgb(30 41 59);
+  color: rgb(226 232 240);
+}
+.dark [class*="border-slate-200"],
+.dark [class*="border-slate-300"] {
+  border-color: rgb(51 65 85); /* slate-700 */
 }

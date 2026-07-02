@@ -6,16 +6,20 @@ import { api } from "@/lib/api";
 import { useEvents } from "@/components/events-provider";
 import { useToast } from "@/components/toast";
 import { Skeleton } from "@/components/ui";
+import { BarChart, ModelBreakdown } from "@/components/cost-chart";
 
 export default function Dashboard() {
   const [data, setData] = useState<any>(null);
+  const [costs, setCosts] = useState<any>(null);
   const { subscribe } = useEvents();
   const toast = useToast();
 
   const load = () => api("/api/dashboard").then(setData).catch(() => {});
+  const loadCosts = () => api("/api/dashboard/costs?days=7").then(setCosts).catch(() => {});
 
   useEffect(() => {
     load();
+    loadCosts();
     return subscribe((type, ev) => {
       if (type === "budget_alert") {
         toast(
@@ -24,7 +28,7 @@ export default function Dashboard() {
         );
         load();
       }
-      if (["task_done", "task_failed", "briefing_ready"].includes(type)) load();
+      if (["task_done", "task_failed", "briefing_ready"].includes(type)) { load(); loadCosts(); }
     });
   }, [subscribe]);
 
@@ -63,6 +67,19 @@ export default function Dashboard() {
             : "暂无任务——去「任务」页下达第一个任务，或在「订阅」页添加自动轮询。"}
         </div>
       </div>
+
+      {costs && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="card">
+            <div className="mb-2 text-sm font-medium">近 7 天花费趋势</div>
+            <BarChart data={costs.daily} />
+          </div>
+          <div className="card">
+            <div className="mb-2 text-sm font-medium">按模型花费占比</div>
+            <ModelBreakdown data={costs.by_model} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

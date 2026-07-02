@@ -17,6 +17,9 @@ export default function Tasks() {
   const [tasks, setTasks] = useState<any[] | null>(null);
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [activeTpl, setActiveTpl] = useState<any>(null);
+  const [tplValues, setTplValues] = useState<Record<string, string>>({});
   const { subscribe } = useEvents();
   const toast = useToast();
 
@@ -24,6 +27,7 @@ export default function Tasks() {
 
   useEffect(() => {
     load();
+    api("/api/tasks/templates").then(setTemplates).catch(() => {});
     return subscribe((type, ev) => {
       if (type === "task_progress") {
         setTasks((ts) => (ts || []).map((t) => t.id === ev.task_id
@@ -51,11 +55,61 @@ export default function Tasks() {
     }
   }
 
+  function openTemplate(tpl: any) {
+    setActiveTpl(tpl);
+    const initial: Record<string, string> = {};
+    for (const f of tpl.fields) initial[f.key] = String(f.default ?? "");
+    setTplValues(initial);
+  }
+
+  async function submitTemplate(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const r = await post("/api/tasks", { template_id: activeTpl.id, template_values: tplValues });
+      toast(`已创建任务「${r.title}」`, "success");
+      setActiveTpl(null);
+      load();
+    } catch (err: any) {
+      toast(err.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        {templates.map((tpl) => (
+          <button key={tpl.id} onClick={() => openTemplate(tpl)}
+            className="card-link px-3 py-2 text-left text-xs" style={{ minWidth: 150 }}>
+            <div className="font-medium">{tpl.name}</div>
+            <div className="text-slate-400">{tpl.description}</div>
+          </button>
+        ))}
+      </div>
+
+      {activeTpl && (
+        <form onSubmit={submitTemplate} className="card space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="font-medium">{activeTpl.name}</div>
+            <button type="button" className="text-xs text-slate-400" onClick={() => setActiveTpl(null)}>取消</button>
+          </div>
+          {activeTpl.fields.map((f: any) => (
+            <label key={f.key} className="block text-sm">
+              <span className="mb-1 block text-xs text-slate-500">{f.label}</span>
+              <input className="input" type={f.type === "number" ? "number" : "text"}
+                placeholder={f.placeholder} value={tplValues[f.key] ?? ""}
+                onChange={(e) => setTplValues({ ...tplValues, [f.key]: e.target.value })} />
+            </label>
+          ))}
+          <button className="btn-primary" disabled={busy}>{busy ? "提交中…" : "创建任务"}</button>
+        </form>
+      )}
+
       <form onSubmit={create} className="card space-y-2">
         <textarea className="input" rows={2} value={prompt} onChange={(e) => setPrompt(e.target.value)}
-          placeholder='用自然语言下任务，如："帮我调研 XXX 的最新进展"' />
+          placeholder='或直接用自然语言下任务，如："帮我调研 XXX 的最新进展"' />
         <div className="flex flex-wrap items-center gap-2">
           <button className="btn-primary" type="submit" disabled={busy}>
             {busy ? "提交中…" : "提交任务"}
@@ -73,7 +127,7 @@ export default function Tasks() {
         <Skeleton rows={3} />
       ) : tasks.length === 0 ? (
         <EmptyState icon="🔁" title="还没有任务"
-          hint="在上面输入框用自然语言下达第一个任务，或点一个示例快速填入。" />
+          hint="用上面的模板或自然语言下达第一个任务。" />
       ) : (
         <div className="space-y-2">
           {tasks.map((t) => {

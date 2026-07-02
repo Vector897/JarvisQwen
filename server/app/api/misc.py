@@ -4,13 +4,18 @@ from __future__ import annotations
 import time
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..auth import current_user, require_admin
+from ..connectors.export import markdown_to_pdf_bytes, to_bibtex
+from ..connectors.notify import notify_all
+from ..connectors.zotero import paper_to_zotero_item, push_papers
 from ..core.budget.guard import today_spend
-from ..core.settings_store import DEFAULTS, all_settings, get_setting, set_setting
+from ..core.router import cascade
+from ..core.settings_store import DEFAULTS, SECRET_KEYS, all_settings, get_setting, set_setting
 from ..db import get_db
 from ..models import (Approval, AuditLog, Briefing, Paper, Subscription, Summary, Task, User)
 
@@ -131,7 +136,7 @@ def audit(task_id: str = "", limit: int = 100,
 # ---------- 设置 ----------
 @router.get("/settings")
 def read_settings(user: User = Depends(current_user), db: Session = Depends(get_db)):
-    return all_settings(db)
+    return all_settings(db, mask_secrets=True)
 
 
 class SettingsIn(BaseModel):
@@ -145,8 +150,134 @@ def write_settings(body: SettingsIn, user: User = Depends(require_admin),
     if unknown:
         raise HTTPException(400, f"未知配置项：{unknown}")
     for k, v in body.values.items():
+        if k in SECRET_KEYS and not str(v).strip():
+            continue  # 密钥字段留空 = 不修改既有值
         set_setting(db, k, v)
     return {"ok": True}
+
+
+@router.post("/settings/test-notify")
+def test_notify(user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    results = notify_all(db, "AAOS 测试推送", "如果你看到这条消息，说明推送配置正确 ✅")
+    if not results:
+        raise HTTPException(400, "未启用任何推送渠道")
+    return {"results": results}
+
+
+# ---------- 导出 ----------
+@router.get("/briefings/{briefing_id}/export")
+def export_briefing(briefing_id: str, fmt: str = "md",
+                    user: User = Depends(current_user), db: Session = Depends(get_db)):
+    b = db.execute(select(Briefing).where(Briefing.id == briefing_id)).scalar_one_or_none()
+    if not b:
+        raise HTTPException(404, "简报不存在")
+    if fmt == "md":
+        return Response(b.content_md, media_type="text/markdown",
+                        headers={"Content-Disposition": f'attachment; filename="briefing_{b.date}.md"'})
+    if fmt == "pdf":
+        try:
+            pdf = markdown_to_pdf_bytes(f"AAOS 简报 {b.date}", b.content_md)
+        except ImportError:
+            raise HTTPException(501, "服务器未安装 PDF 导出依赖（pip install reportlab）")
+        return Response(pdf, media_type="application/pdf",
+                        headers={"Content-Disposition": f'attachment; filename="briefing_{b.date}.pdf"'})
+    raise HTTPException(400, "fmt 必须是 md 或 pdf")
+
+
+@router.get("/library/export")
+def export_library(fmt: str = "bibtex", user: User = Depends(current_user), db: Session = Depends(get_db)):
+    stmt = select(Paper).order_by(Paper.created_at.desc())
+    if user.role != "admin":
+        stmt = stmt.where(Paper.owner_id == user.id)
+    papers = db.execute(stmt).scalars().all()
+    if fmt == "bibtex":
+        text = to_bibtex([{"arxiv_id": p.arxiv_id, "title": p.title, "authors": p.authors,
+                           "published_at": p.published_at, "url": p.url} for p in papers])
+        return Response(text, media_type="application/x-bibtex",
+                        headers={"Content-Disposition": 'attachment; filename="aaos_library.bib"'})
+    raise HTTPException(400, "目前仅支持 fmt=bibtex")
+
+
+# ---------- Zotero 同步 ----------
+@router.post("/library/{paper_id}/zotero-sync")
+def zotero_sync_one(paper_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    p = db.execute(select(Paper).where(Paper.id == paper_id)).scalar_one_or_none()
+    if not p:
+        raise HTTPException(404, "论文不存在")
+    item = paper_to_zotero_item(p.title, p.authors, p.abstract, p.url, p.published_at, p.arxiv_id)
+    ok, msg = push_papers(db, [item])
+    if not ok:
+        raise HTTPException(400, msg)
+    return {"ok": True, "message": msg}
+
+
+# ---------- 跨库问答（library_qa，paper-qa 思想的轻量实现）----------
+class QaIn(BaseModel):
+    question: str
+
+
+@router.post("/library/qa")
+def library_qa(body: QaIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if not body.question.strip():
+        raise HTTPException(400, "问题不能为空")
+    stmt = select(Paper).order_by(Paper.created_at.desc()).limit(200)
+    if user.role != "admin":
+        stmt = stmt.where(Paper.owner_id == user.id)  # AFR：先过滤再检索
+    papers = db.execute(stmt).scalars().all()
+    if not papers:
+        return {"answer": "知识库为空，还没有可供检索的论文。", "cited": [], "escalated": False}
+
+    terms = [t for t in body.question.lower().split() if len(t) > 1]
+    scored = []
+    for p in papers:
+        s = db.execute(select(Summary).where(Summary.paper_id == p.id)
+                       .order_by(Summary.created_at.desc())).scalars().first()
+        haystack = f"{p.title} {p.abstract} {s.content_md if s else ''}".lower()
+        score = sum(1 for t in terms if t in haystack)
+        if score > 0:
+            scored.append((score, p, s))
+    scored.sort(key=lambda x: -x[0])
+    top = scored[:6]
+    if not top:
+        return {"answer": "知识库中没有找到相关论文，试试换个关键词，或先跑一次文献跟踪任务。",
+                "cited": [], "escalated": False}
+
+    evidence = "\n\n".join(
+        f"[{i+1}] 《{p.title}》：{(s.content_md if s else p.abstract)[:600]}"
+        for i, (_, p, s) in enumerate(top)
+    )
+    prompt = (
+        f"根据以下我知识库中的论文证据回答问题。回答时用 [编号] 标注引用来源，不要编造未提及的内容。\n\n"
+        f"问题：{body.question}\n\n证据：\n{evidence}"
+    )
+    result, escalated = cascade.complete_cascade(db, prompt, step="library_qa", max_tokens=1200)
+    return {"answer": result.text, "escalated": escalated,
+            "cited": [{"id": p.id, "title": p.title, "url": p.url} for _, p, _ in top]}
+
+
+# ---------- 成本分析 ----------
+@router.get("/dashboard/costs")
+def dashboard_costs(days: int = 7, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    days = max(1, min(days, 30))
+    since = time.time() - days * 86400
+    rows = db.execute(select(AuditLog).where(AuditLog.ts >= since)).scalars().all()
+    daily: dict[str, float] = {}
+    by_model: dict[str, float] = {}
+    for r in rows:
+        day = time.strftime("%m-%d", time.localtime(r.ts))
+        daily[day] = daily.get(day, 0) + r.cost_usd
+        model_key = r.model.split("::")[-1] if r.model else "(其他)"
+        by_model[model_key] = by_model.get(model_key, 0) + r.cost_usd
+    # 补齐没有花费的日期，保证图表连续
+    ordered_days = []
+    for i in range(days - 1, -1, -1):
+        day = time.strftime("%m-%d", time.localtime(time.time() - i * 86400))
+        ordered_days.append({"date": day, "cost_usd": round(daily.get(day, 0), 4)})
+    model_breakdown = sorted(
+        [{"model": k, "cost_usd": round(v, 4)} for k, v in by_model.items()],
+        key=lambda x: -x["cost_usd"],
+    )
+    return {"daily": ordered_days, "by_model": model_breakdown}
 
 
 # ---------- 仪表盘 ----------

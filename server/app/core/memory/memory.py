@@ -36,8 +36,42 @@ def retrieve(db: Session, owner_id: str, query_terms: list[str], limit: int = 10
     return hits
 
 
+def _keyword_overlap(a: str, b: str) -> float:
+    wa, wb = set(a.lower().split()), set(b.lower().split())
+    if not wa or not wb:
+        return 0.0
+    return len(wa & wb) / len(wa | wb)
+
+
+def _find_conflict(db: Session, owner_id: str, new_fact: str) -> Memory | None:
+    """粗粒度冲突检测：找与新事实主题重叠但内容不同的既有语义记忆（时序仲裁候选）。"""
+    existing = db.execute(
+        select(Memory).where(Memory.kind == "semantic", Memory.owner_id == owner_id, Memory.archived == 0)
+    ).scalars().all()
+    best, best_score = None, 0.0
+    for m in existing:
+        overlap = _keyword_overlap(new_fact, m.content)
+        if overlap > best_score:
+            best_score, best = overlap, m
+    # 主题重叠但不是同一句话 → 可能是同一话题的新旧表述，交给仲裁
+    if best is not None and 0.35 <= best_score < 0.95:
+        return best
+    return None
+
+
+def _arbitrate(db: Session, old: Memory, new_fact: str) -> str:
+    """时序仲裁：生成保留历史连续性的调和摘要，而非硬覆盖。"""
+    prompt = (
+        "以下是同一话题在不同时间点的两条记录，可能存在更新或矛盾。"
+        "请用一句话生成带时间感的调和摘要（如「X 在 T1 前是 A，此后更新为 B」）："
+        f"\n旧记录：{old.content}\n新记录：{new_fact}"
+    )
+    result = llm.complete(db, prompt, tier=policy.TIER_LIGHT, step="memory_arbitrate", max_tokens=200)
+    return result.text.strip() or f"{old.content}（已更新：{new_fact}）"
+
+
 def consolidate(db: Session, owner_id: str) -> int:
-    """夜间整合：把近 24h 情节记忆交给轻量层提炼为语义记忆。"""
+    """夜间整合：把近 24h 情节记忆交给轻量层提炼为语义记忆；冲突时时序仲裁而非硬覆盖。"""
     cutoff = time.time() - 86400
     episodes = db.execute(
         select(Memory).where(
@@ -56,10 +90,19 @@ def consolidate(db: Session, owner_id: str) -> int:
     result = llm.complete(db, prompt, tier=policy.TIER_LIGHT, step="memory_consolidate", max_tokens=512)
     count = 0
     for line in result.text.splitlines():
-        line = line.strip().lstrip("0123456789.、- ")
-        if len(line) >= 8:
-            db.add(Memory(kind="semantic", content=line, tags="consolidated", owner_id=owner_id))
-            count += 1
+        fact = line.strip().lstrip("0123456789.、- ")
+        if len(fact) < 8:
+            continue
+        conflict = _find_conflict(db, owner_id, fact)
+        if conflict is not None:
+            reconciled = _arbitrate(db, conflict, fact)
+            conflict.content = reconciled
+            conflict.confidence = min(1.0, conflict.confidence + 0.1)
+            conflict.ts = time.time()
+            conflict.tags = (conflict.tags + ",reconciled").strip(",")
+        else:
+            db.add(Memory(kind="semantic", content=fact, tags="consolidated", owner_id=owner_id))
+        count += 1
     return count
 
 

@@ -15,6 +15,9 @@ class BudgetExceeded(Exception):
     pass
 
 
+_last_cutoff_notified_date = ""  # 同一天只推送一次熔断通知，避免刷屏
+
+
 def today_start_ts() -> float:
     lt = time.localtime()
     return time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 0, 0, 0, 0, 0, -1))
@@ -29,10 +32,16 @@ def today_spend(db: Session) -> float:
 
 def check(db: Session, task: Task | None = None, upcoming_estimate: float = 0.01) -> None:
     """在每次 LLM 出境调用前检查。超限抛 BudgetExceeded → 任务挂起而非死循环烧钱。"""
+    global _last_cutoff_notified_date
     daily_limit = float(get_setting(db, "daily_budget_usd"))
     spent = today_spend(db)
     if spent + upcoming_estimate >= daily_limit:
         bus.publish("budget_alert", {"level": "cutoff", "spent": spent, "limit": daily_limit})
+        today = time.strftime("%Y-%m-%d")
+        if get_setting(db, "notify_on_budget_cutoff") and _last_cutoff_notified_date != today:
+            _last_cutoff_notified_date = today
+            from ...connectors.notify import notify_all
+            notify_all(db, "AAOS 预算熔断", f"今日花费已达 ${spent:.2f}/${daily_limit:.2f}，任务已挂起等待明日或调高预算。")
         raise BudgetExceeded(f"日预算已用尽（${spent:.2f}/${daily_limit:.2f}）")
     if spent >= 0.8 * daily_limit:
         bus.publish("budget_alert", {"level": "warn", "spent": spent, "limit": daily_limit})

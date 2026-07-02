@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
-from .api import auth_api, events, keys, misc, tasks
+from .api import auth_api, events, keys, misc, tasks, users
 from .auth import ensure_admin_user
 from .config import config
 from .core.engine import graphs  # noqa: F401  导入即注册任务图
@@ -47,6 +47,7 @@ app.include_router(keys.router)
 app.include_router(tasks.router)
 app.include_router(misc.router)
 app.include_router(events.router)
+app.include_router(users.router)
 
 
 @app.get("/healthz")

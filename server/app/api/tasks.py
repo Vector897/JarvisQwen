@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import current_user
 from ..core.engine.engine import REGISTRY, latest_checkpoint, step_durations
+from ..core.engine.task_templates import TEMPLATES, apply_template
 from ..db import get_db
 from ..models import Task, User
 
@@ -23,6 +24,13 @@ class TaskIn(BaseModel):
     title: str = ""
     budget_limit_usd: float = 1.0
     priority: int = 5
+    template_id: str = ""  # 优先级：template_id > type > prompt
+    template_values: dict = {}
+
+
+@router.get("/templates")
+def list_templates():
+    return TEMPLATES
 
 
 def _parse_prompt(prompt: str) -> tuple[str, dict, str]:
@@ -43,12 +51,17 @@ def _parse_prompt(prompt: str) -> tuple[str, dict, str]:
 def create_task(body: TaskIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     if user.role == "viewer":
         raise HTTPException(403, "viewer 无权创建任务")
-    if body.type:
+    if body.template_id:
+        try:
+            ttype, params, title = apply_template(body.template_id, body.template_values)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+    elif body.type:
         ttype, params, title = body.type, body.params, body.title or body.type
     elif body.prompt:
         ttype, params, title = _parse_prompt(body.prompt)
     else:
-        raise HTTPException(400, "需要 type 或 prompt")
+        raise HTTPException(400, "需要 type、prompt 或 template_id")
     if ttype not in REGISTRY:
         raise HTTPException(400, f"未知任务类型：{ttype}，可用：{list(REGISTRY)}")
     task = Task(type=ttype, title=title, params_json=json.dumps(params, ensure_ascii=False),
