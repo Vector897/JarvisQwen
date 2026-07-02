@@ -1,0 +1,36 @@
+# AAOS 模式 A：全自托管（一台免费 VM 全搞定）
+# 用法：docker compose up -d
+# HTTPS：有域名时解开 caddy 注释并改 Caddyfile 中的域名
+
+services:
+  server:
+    build: ./server
+    restart: unless-stopped
+    volumes:
+      - ./data:/srv/data
+    environment:
+      - AAOS_DATA_DIR=/srv/data
+    ports:
+      - "8000:8000"
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    environment:
+      - BACKEND_URL=http://server:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - server
+
+  # caddy:
+  #   image: caddy:2-alpine
+  #   restart: unless-stopped
+  #   ports: ["80:80", "443:443"]
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile
+  #     - caddy_data:/data
+  #   depends_on: [web]
+
+# volumes:
+#   caddy_data:

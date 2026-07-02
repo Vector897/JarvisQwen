@@ -1,0 +1,10 @@
+{
+  "name": "AAOS 控制台",
+  "short_name": "AAOS",
+  "description": "AI Agent Operating System",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f172a",
+  "icons": []
+}

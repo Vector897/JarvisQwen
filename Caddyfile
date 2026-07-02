@@ -1,0 +1,4 @@
+# 改成你的域名后，Caddy 自动申请 HTTPS 证书
+your-domain.example.com {
+    reverse_proxy web:3000
+}
