@@ -26,18 +26,7 @@ export const put = <T = any>(path: string, body: any) =>
   api<T>(path, { method: "PUT", body: JSON.stringify(body) });
 export const del = <T = any>(path: string) => api<T>(path, { method: "DELETE" });
 
-/** 订阅 SSE 事件流；返回取消函数。 */
-export function subscribeEvents(onEvent: (type: string, data: any) => void): () => void {
-  const es = new EventSource("/api/events");
-  const types = [
-    "task_progress", "task_done", "task_failed", "task_suspended",
-    "budget_alert", "briefing_ready", "approval_needed", "task_zombie_requeued",
-  ];
-  for (const t of types) {
-    es.addEventListener(t, (e) => onEvent(t, JSON.parse((e as MessageEvent).data)));
-  }
-  return () => es.close();
-}
+// SSE 订阅已迁移到全局单连接：见 components/events-provider.tsx 的 useEvents()
 
 export function fmtTime(ts: number): string {
   if (!ts) return "-";

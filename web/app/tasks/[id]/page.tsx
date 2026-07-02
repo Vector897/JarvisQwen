@@ -4,7 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ReactFlow, Background, type Node, type Edge } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { api, post, subscribeEvents, fmtEta, fmtTime, STATUS_LABEL } from "@/lib/api";
+import { api, post, fmtEta, fmtTime, STATUS_LABEL } from "@/lib/api";
+import { useEvents } from "@/components/events-provider";
+import { useToast } from "@/components/toast";
+import { Skeleton } from "@/components/ui";
 
 const NODE_COLOR: Record<string, string> = {
   done: "#10b981",
@@ -19,20 +22,21 @@ export default function TaskDetail() {
   const { id } = useParams<{ id: string }>();
   const [task, setTask] = useState<any>(null);
   const [sub, setSub] = useState("");
+  const { subscribe } = useEvents();
+  const toast = useToast();
 
   const load = useCallback(() => api(`/api/tasks/${id}`).then(setTask).catch(() => {}), [id]);
 
   useEffect(() => {
     load();
-    const off = subscribeEvents((type, ev) => {
+    return subscribe((type, ev) => {
       if (ev.task_id !== id) return;
       if (ev.sub_progress) setSub(ev.sub_progress);
       load();
     });
-    return off;
-  }, [id, load]);
+  }, [id, load, subscribe]);
 
-  if (!task) return <p className="text-slate-400">加载中…</p>;
+  if (!task) return <Skeleton rows={4} />;
   const [label, cls] = STATUS_LABEL[task.status] || [task.status, "bg-slate-100"];
 
   const nodes: Node[] = task.pipeline.map((s: any, i: number) => ({
@@ -83,12 +87,14 @@ export default function TaskDetail() {
 
       <div className="flex gap-2">
         {["FAILED", "SUSPENDED", "DONE"].includes(task.status) && (
-          <button className="btn-primary" onClick={() => post(`/api/tasks/${id}/rerun`, {}).then(load)}>
+          <button className="btn-primary"
+            onClick={() => post(`/api/tasks/${id}/rerun`, {}).then(() => { toast("已从检查点重新排队", "success"); load(); })}>
             从检查点重跑
           </button>
         )}
         {["QUEUED", "SUSPENDED", "WAITING_APPROVAL"].includes(task.status) && (
-          <button className="btn-ghost" onClick={() => post(`/api/tasks/${id}/cancel`, {}).then(load)}>
+          <button className="btn-ghost"
+            onClick={() => post(`/api/tasks/${id}/cancel`, {}).then(() => { toast("任务已取消", "info"); load(); })}>
             取消任务
           </button>
         )}

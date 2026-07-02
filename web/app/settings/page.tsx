@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, post, put, del } from "@/lib/api";
+import { useToast } from "@/components/toast";
 
 const PROVIDER_LABEL: Record<string, string> = {
   anthropic: "Anthropic (Claude)",
@@ -32,6 +33,7 @@ function KeysSection() {
   const [msg, setMsg] = useState("");
   const [needProvider, setNeedProvider] = useState(false);
   const [busy, setBusy] = useState(false);
+  const toast = useToast();
 
   const load = () => api("/api/keys").then(setKeys).catch(() => {});
   useEffect(() => { load(); }, []);
@@ -45,12 +47,13 @@ function KeysSection() {
         setNeedProvider(true);
         setMsg(r.message);
       } else {
-        setMsg(`已保存 ${r.masked}（${r.provider}）· ${r.message}`);
+        toast(`已保存 ${r.masked}（${r.provider}）· ${r.message}`, "success");
+        setMsg("");
         setRaw(""); setProvider(""); setBaseUrl(""); setNeedProvider(false);
         load();
       }
     } catch (err: any) {
-      setMsg(err.message);
+      toast(err.message, "error");
     } finally {
       setBusy(false);
     }
@@ -95,7 +98,7 @@ function KeysSection() {
             </div>
             <div className="flex gap-2">
               <button className="btn-ghost text-xs"
-                onClick={() => post(`/api/keys/${k.id}/probe`, {}).then((r) => { alert(r.message); load(); })}>
+                onClick={() => post(`/api/keys/${k.id}/probe`, {}).then((r) => { toast(r.message, r.ok ? "success" : "error"); load(); })}>
                 探活
               </button>
               <button className="btn-ghost text-xs text-red-600"
