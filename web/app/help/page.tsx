@@ -1,10 +1,17 @@
 "use client";
 
-/** 帮助页：讲清 AAOS 如何运作、有哪些防呆机制、名词解释、故障排查。 */
+import { useLang } from "@/lib/i18n";
+
+/** 帮助页：讲清 AAOS 如何运作、有哪些防呆机制、名词解释、故障排查。
+ *  长文档说明，保留中文原文；lang=en 时顶部提示条说明这一范围边界。 */
 
 export default function Help() {
+  const { lang, t } = useLang();
   return (
     <div className="space-y-6 leading-relaxed">
+      {lang === "en" && (
+        <div className="card border-amber-300 bg-amber-50 text-sm text-amber-800">{t("help.langNotice")}</div>
+      )}
       <section className="card space-y-2">
         <h2 className="text-lg font-bold">AAOS 是什么</h2>
         <p className="text-sm text-slate-600">

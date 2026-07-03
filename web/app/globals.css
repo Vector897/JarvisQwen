@@ -2,65 +2,140 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors;
+/* 设计令牌 · 三层架构：Base (色阶) → Semantic (意图) → Component (组件)
+   语义色名如 surface-base, content-primary, action-primary 等
+   由 tailwind.config.ts 引用此处 CSS 变量；组件只应使用语义色。 */
+:root {
+  /* Base：OKLCH 中性色阶，保证感知均匀性 */
+  --base-neutral-50: oklch(98.4% 0.002 247.84);
+  --base-neutral-100: oklch(96.8% 0.007 247.9);
+  --base-neutral-200: oklch(92.9% 0.013 255.51);
+  --base-neutral-300: oklch(86.9% 0.022 252.89);
+  --base-neutral-400: oklch(70.4% 0.04 256.79);
+  --base-neutral-500: oklch(55.4% 0.046 257.42);
+  --base-neutral-700: oklch(37.2% 0.044 257.29);
+  --base-neutral-800: oklch(27.9% 0.041 260.03);
+  --base-neutral-900: oklch(20.8% 0.042 265.76);
+  --base-neutral-950: oklch(12.9% 0.042 264.7);
+  /* Base：品牌/强调色 */
+  --base-brand-500: oklch(62.3% 0.214 259.82);
+
+  /* Semantic：浅色模式 */
+  --color-surface-base: oklch(100% 0 0);
+  --color-surface-raised: var(--base-neutral-50);
+  --color-surface-sunken: var(--base-neutral-50);
+  --color-content-primary: var(--base-neutral-900);
+  --color-content-secondary: var(--base-neutral-700);
+  --color-content-muted: var(--base-neutral-500);
+  --color-action-primary: var(--base-neutral-900);
+  --color-action-primary-hover: var(--base-neutral-700);
+  --color-border-subtle: var(--base-neutral-200);
+
+  --radius-elegant: 1.25rem;
+  --shadow-modern: 0 4px 6px -1px oklch(20.8% 0.042 265.76 / 8%);
 }
 
+.dark {
+  --color-surface-base: var(--base-neutral-950);
+  --color-surface-raised: var(--base-neutral-900);
+  --color-surface-sunken: var(--base-neutral-900);
+  --color-content-primary: var(--base-neutral-50);
+  --color-content-secondary: var(--base-neutral-300);
+  --color-content-muted: var(--base-neutral-400);
+  --color-action-primary: var(--base-neutral-50);
+  --color-action-primary-hover: oklch(100% 0 0);
+  --color-border-subtle: var(--base-neutral-800);
+  --shadow-modern: 0 4px 6px -1px oklch(0% 0 0 / 30%);
+}
+
+body {
+  background-color: var(--color-surface-sunken);
+  color: var(--color-content-primary);
+  @apply transition-colors;
+}
+
+/* ---- 组件层：全部引用语义色，深浅色自动切换 ---- */
 .card {
-  @apply bg-white rounded-xl border border-slate-200 shadow-sm p-4 dark:bg-slate-900 dark:border-slate-800;
+  background-color: var(--color-surface-base);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-elegant);
+  box-shadow: var(--shadow-modern);
+  @apply p-4;
 }
 .btn {
-  @apply inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium
+    transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 .btn-primary {
-  @apply btn bg-slate-900 text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white;
+  background-color: var(--color-action-primary);
+  color: var(--color-surface-base);
+  @apply btn;
 }
+.btn-primary:hover { background-color: var(--color-action-primary-hover); }
 .btn-ghost {
-  @apply btn bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700;
+  background-color: var(--color-surface-raised);
+  color: var(--color-content-primary);
+  @apply btn;
 }
+.btn-ghost:hover { filter: brightness(0.96); }
+.dark .btn-ghost:hover { filter: brightness(1.15); }
 .input {
-  @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 transition-shadow dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:focus:ring-slate-600;
+  background-color: var(--color-surface-base);
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-content-primary);
+  @apply w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 transition-shadow;
 }
+.input:focus { --tw-ring-color: var(--base-neutral-400); }
 .badge {
   @apply inline-block rounded-full px-2 py-0.5 text-xs font-medium;
 }
 
-/* 卡片链接 hover 微交互 */
+/* 卡片链接 hover：弹簧曲线允许轻微过冲，物理反馈感 */
 .card-link {
-  @apply card block transition-all hover:border-slate-400 hover:shadow-md active:scale-[0.99] dark:hover:border-slate-600;
+  @apply card block transition-all duration-300;
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+.card-link:hover {
+  transform: scale(1.012) translateY(-1px);
+  border-color: var(--color-content-muted);
+  box-shadow: 0 8px 16px -4px oklch(20.8% 0.042 265.76 / 12%);
+}
+.card-link:active { transform: scale(0.99); }
 
-/* Toast 滑入动画 */
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(8px) scale(0.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .animate-toast {
-  animation: toast-in 0.2s ease-out;
+  animation: toast-in 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* 骨架屏 */
 .skeleton {
-  @apply animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800;
+  background-color: var(--color-surface-raised);
+  @apply animate-pulse rounded-lg;
 }
 
-/* 进度条通用过渡 */
 .progress-bar {
-  @apply h-full transition-all duration-500 ease-out;
+  @apply h-full transition-all duration-500;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* 深色模式兜底：页面里大量直接写死的 text-slate-900/700 在浅色下是标题/正文色，
-   在深色背景下会失去对比度。用属性选择器统一收编，不必逐页面加 dark: 前缀。 */
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* 深色模式兜底：历史遗留的原始 slate 工具类在深色背景下对比度不足 */
 .dark [class*="text-slate-900"],
 .dark [class*="text-slate-800"],
 .dark [class*="text-slate-700"] {
-  color: rgb(226 232 240); /* slate-200 */
+  color: rgb(226 232 240);
 }
 .dark [class*="text-slate-600"] {
-  color: rgb(203 213 225); /* slate-300 */
+  color: rgb(203 213 225);
 }
 .dark [class*="bg-slate-50"]:not(.card):not(body) {
-  background-color: rgb(30 41 59); /* slate-800，如任务列表内嵌浅底块 */
+  background-color: rgb(30 41 59);
 }
 .dark [class*="bg-slate-100"]:not(.btn-ghost) {
   background-color: rgb(30 41 59);
@@ -68,5 +143,5 @@ body {
 }
 .dark [class*="border-slate-200"],
 .dark [class*="border-slate-300"] {
-  border-color: rgb(51 65 85); /* slate-700 */
+  border-color: rgb(51 65 85);
 }

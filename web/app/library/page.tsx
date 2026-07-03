@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { api, post } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { EmptyState, Skeleton } from "@/components/ui";
+import { useLang } from "@/lib/i18n";
 
 export default function Library() {
   const [papers, setPapers] = useState<any[] | null>(null);
   const [q, setQ] = useState("");
   const toast = useToast();
+  const { t } = useLang();
 
   const load = (query = "") =>
     api(`/api/library?q=${encodeURIComponent(query)}`).then(setPapers).catch(() => {});
@@ -27,17 +29,17 @@ export default function Library() {
 
       <form className="card flex gap-2" onSubmit={(e) => { e.preventDefault(); load(q); }}>
         <input className="input flex-1" value={q} onChange={(e) => setQ(e.target.value)}
-          placeholder="搜索已归档论文（标题/摘要）" />
-        <button className="btn-primary">搜索</button>
+          placeholder={t("library.searchPlaceholder")} />
+        <button className="btn-primary">{t("library.search")}</button>
         <a className="btn-ghost" href="/api/library/export?fmt=bibtex" download>
-          导出 BibTeX
+          {t("library.exportBibtex")}
         </a>
       </form>
 
       {papers === null ? (
         <Skeleton rows={3} />
       ) : papers.length === 0 ? (
-        <EmptyState icon="📚" title="知识库为空" hint="创建文献跟踪任务或添加订阅后会自动填充。" />
+        <EmptyState icon="📚" title={t("library.empty")} hint={t("library.emptyHint")} />
       ) : (
         <div className="space-y-2">
           {papers.map((p) => (
@@ -45,7 +47,7 @@ export default function Library() {
               <summary className="cursor-pointer">
                 <span className="font-medium">{p.title}</span>
                 <span className="ml-2 text-xs text-slate-400">
-                  {p.published_at}{p.has_pdf ? " · PDF已归档" : ""}
+                  {p.published_at}{p.has_pdf ? " · PDF" : ""}
                 </span>
               </summary>
               <div className="mt-2 space-y-2 text-sm">
@@ -57,10 +59,10 @@ export default function Library() {
                 )}
                 <div className="flex flex-wrap items-center gap-3 pt-1">
                   <a href={p.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
-                    查看原文 →
+                    {t("library.viewOriginal")}
                   </a>
                   <button className="btn-ghost text-xs" onClick={() => syncZotero(p.id)}>
-                    同步到 Zotero
+                    {t("library.zoteroSync")}
                   </button>
                 </div>
               </div>
@@ -77,6 +79,7 @@ function QaBox() {
   const [answer, setAnswer] = useState<{ answer: string; cited: any[]; escalated: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
+  const { t } = useLang();
 
   async function ask(e: React.FormEvent) {
     e.preventDefault();
@@ -95,18 +98,18 @@ function QaBox() {
 
   return (
     <div className="card space-y-2">
-      <div className="font-medium">🔎 问知识库</div>
-      <p className="text-xs text-slate-500">对已归档的全部论文提问，系统会检索相关证据并标注引用来源。</p>
+      <div className="font-medium">{t("library.qaTitle")}</div>
+      <p className="text-xs text-slate-500">{t("library.qaHint")}</p>
       <form onSubmit={ask} className="flex gap-2">
         <input className="input flex-1" value={question} onChange={(e) => setQuestion(e.target.value)}
-          placeholder="如：我库里关于灾难性遗忘的论文都提出了什么解决方案？" />
-        <button className="btn-primary" disabled={busy}>{busy ? "检索中…" : "提问"}</button>
+          placeholder={t("library.qaPlaceholder")} />
+        <button className="btn-primary" disabled={busy}>{busy ? t("library.qaAsking") : t("library.qaAsk")}</button>
       </form>
       {answer && (
         <div className="rounded-lg bg-slate-50 p-3 text-sm">
           <div className="whitespace-pre-wrap">{answer.answer}</div>
           {answer.escalated && (
-            <div className="mt-1 text-xs text-amber-600">（轻量层置信度不足，已自动升级到前沿模型重答）</div>
+            <div className="mt-1 text-xs text-amber-600">{t("library.qaEscalated")}</div>
           )}
           {answer.cited.length > 0 && (
             <div className="mt-2 space-y-1 border-t border-slate-200 pt-2 text-xs">

@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { api, fmtTime } from "@/lib/api";
+import { useLang } from "@/lib/i18n";
 
 export default function Audit() {
   const [rows, setRows] = useState<any[]>([]);
+  const { t } = useLang();
   useEffect(() => { api("/api/audit").then(setRows).catch(() => {}); }, []);
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">审计流水</h1>
-      <p className="text-sm text-slate-500">每一次 LLM 出境调用的模型、token、费用与输入输出摘要（append-only）。</p>
+      <p className="text-sm text-slate-500">{t("audit.hint")}</p>
       <div className="space-y-2">
         {rows.map((r) => (
           <details key={r.id} className="card text-sm">
@@ -19,17 +20,17 @@ export default function Audit() {
               <span className="badge bg-slate-100">{r.model}</span>
               {r.step && <span className="text-xs text-slate-400">{r.step}</span>}
               <span className="ml-auto font-mono text-xs">
-                {r.cached ? "缓存命中 · $0" : r.simulated ? "dry-run · $0" :
+                {r.cached ? `${t("audit.cacheHit")} · $0` : r.simulated ? `${t("audit.dryRun")} · $0` :
                   `${r.tokens_in}→${r.tokens_out} tok · $${r.cost_usd}`}
               </span>
             </summary>
             <div className="mt-2 space-y-1 text-xs text-slate-600">
-              <p><b>输入：</b>{r.input_digest}</p>
-              <p><b>输出：</b>{r.output_digest}</p>
+              <p><b>{t("audit.input")}</b>{r.input_digest}</p>
+              <p><b>{t("audit.output")}</b>{r.output_digest}</p>
             </div>
           </details>
         ))}
-        {rows.length === 0 && <p className="text-sm text-slate-400">暂无调用记录。</p>}
+        {rows.length === 0 && <p className="text-sm text-slate-400">{t("audit.empty")}</p>}
       </div>
     </div>
   );

@@ -3,14 +3,15 @@
 import { useEffect, useState } from "react";
 import { api, post, put, del } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { useLang } from "@/lib/i18n";
 
 const PROVIDER_LABEL: Record<string, string> = {
   anthropic: "Anthropic (Claude)",
   openai: "OpenAI (GPT)",
   google: "Google (Gemini)",
   deepseek: "DeepSeek",
-  openrouter: "OpenRouter（聚合网关）",
-  custom: "自定义 OpenAI 兼容端点",
+  openrouter: "OpenRouter",
+  custom: "Custom OpenAI-compatible",
 };
 
 export default function Settings() {
@@ -39,6 +40,7 @@ function KeysSection() {
   const [needProvider, setNeedProvider] = useState(false);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
+  const { t } = useLang();
 
   const load = () => api("/api/keys").then(setKeys).catch(() => {});
   useEffect(() => { load(); }, []);
@@ -52,7 +54,7 @@ function KeysSection() {
         setNeedProvider(true);
         setMsg(r.message);
       } else {
-        toast(`已保存 ${r.masked}（${r.provider}）· ${r.message}`, "success");
+        toast(`${r.masked}（${r.provider}）· ${r.message}`, "success");
         setMsg("");
         setRaw(""); setProvider(""); setBaseUrl(""); setNeedProvider(false);
         load();
@@ -66,28 +68,24 @@ function KeysSection() {
 
   return (
     <section className="space-y-3">
-      <h2 className="text-lg font-semibold">API Key</h2>
-      <p className="text-sm text-slate-500">
-        粘贴即可——自动去除空格/引号/Bearer 前缀、全角转半角、识别厂商，保存时实时探活校验。
-      </p>
+      <h2 className="text-lg font-semibold">{t("settings.keysTitle")}</h2>
+      <p className="text-sm text-slate-500">{t("settings.keysHint")}</p>
       <form onSubmit={add} className="card space-y-2">
         <textarea className="input font-mono" rows={2} value={raw}
           onChange={(e) => setRaw(e.target.value)}
-          placeholder="粘贴你的 API Key（怎么粘都行，系统会自动修正格式）" />
+          placeholder={t("settings.keysPlaceholder")} />
         {(needProvider || provider || baseUrl) && (
           <select className="input" value={provider} onChange={(e) => setProvider(e.target.value)}>
-            <option value="">选择厂商…</option>
+            <option value="">{t("settings.selectProvider")}</option>
             {Object.entries(PROVIDER_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         )}
         <details>
-          <summary className="cursor-pointer text-xs text-slate-400">
-            高级：自定义 OpenAI 兼容端点（各类中转站/自部署 vLLM）
-          </summary>
+          <summary className="cursor-pointer text-xs text-slate-400">{t("settings.keysAdvanced")}</summary>
           <input className="input mt-2" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)}
             placeholder="https://your-gateway.example.com/v1" />
         </details>
-        <button className="btn-primary" disabled={busy}>{busy ? "校验中…" : "保存并校验"}</button>
+        <button className="btn-primary" disabled={busy}>{busy ? t("settings.keysVerifying") : t("settings.keysSave")}</button>
         {msg && <p className="text-sm text-slate-600">{msg}</p>}
       </form>
       <div className="space-y-2">
@@ -104,17 +102,15 @@ function KeysSection() {
             <div className="flex gap-2">
               <button className="btn-ghost text-xs"
                 onClick={() => post(`/api/keys/${k.id}/probe`, {}).then((r) => { toast(r.message, r.ok ? "success" : "error"); load(); })}>
-                探活
+                {t("settings.keysProbe")}
               </button>
               <button className="btn-ghost text-xs text-red-600"
-                onClick={() => del(`/api/keys/${k.id}`).then(load)}>删除</button>
+                onClick={() => del(`/api/keys/${k.id}`).then(load)}>{t("common.delete")}</button>
             </div>
           </div>
         ))}
         {keys.length === 0 && (
-          <p className="text-sm text-amber-600">
-            尚未配置任何 Key——系统当前运行在 dry-run 模式（LLM 返回模拟响应，不产生费用）。
-          </p>
+          <p className="text-sm text-amber-600">{t("settings.keysEmpty")}</p>
         )}
       </div>
     </section>
@@ -125,6 +121,7 @@ function KeysSection() {
 function GeneralSection() {
   const [s, setS] = useState<any>(null);
   const toast = useToast();
+  const { t } = useLang();
 
   useEffect(() => { api("/api/settings").then(setS).catch(() => {}); }, []);
   if (!s) return null;
@@ -145,7 +142,7 @@ function GeneralSection() {
           cascade_confidence_threshold: Number(s.cascade_confidence_threshold),
         },
       });
-      toast("已保存，立即生效", "success");
+      toast(t("settings.saved"), "success");
     } catch (err: any) { toast(err.message, "error"); }
   }
 
@@ -154,62 +151,62 @@ function GeneralSection() {
 
   return (
     <section className="space-y-3">
-      <h2 className="text-lg font-semibold">运行参数</h2>
+      <h2 className="text-lg font-semibold">{t("settings.generalTitle")}</h2>
       <div className="card space-y-4 text-sm">
         <label className="block">
-          <span className="mb-1 block font-medium">我的研究方向（用于论文初筛与总结）</span>
+          <span className="mb-1 block font-medium">{t("settings.researchProfile")}</span>
           <textarea className="input" rows={2} value={s.research_profile} onChange={set("research_profile")}
-            placeholder="如：离散 CFR 与多智能体辩论中的灾难性遗忘问题" />
+            placeholder="e.g. Catastrophic forgetting in discrete CFR / multi-agent debate" />
         </label>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block font-medium">每日预算上限（美元）</span>
+            <span className="mb-1 block font-medium">{t("settings.dailyBudget")}</span>
             <input className="input" type="number" step="0.5" min="0"
               value={s.daily_budget_usd} onChange={set("daily_budget_usd")} />
           </label>
           <label className="block">
-            <span className="mb-1 block font-medium">脱敏等级</span>
+            <span className="mb-1 block font-medium">{t("settings.redactLevel")}</span>
             <select className="input" value={s.redact_level} onChange={set("redact_level")}>
-              <option value="low">低（只拦截明确凭证）</option>
-              <option value="medium">中（凭证+PII 占位符替换）</option>
-              <option value="high">高（高危命中直接阻断出境）</option>
+              <option value="low">{t("settings.redactLow")}</option>
+              <option value="medium">{t("settings.redactMed")}</option>
+              <option value="high">{t("settings.redactHigh")}</option>
             </select>
           </label>
           <label className="block">
-            <span className="mb-1 block font-medium">轻量层模型（解析/初筛/简报）</span>
+            <span className="mb-1 block font-medium">{t("settings.modelLight")}</span>
             <input className="input font-mono" value={s.model_light} onChange={set("model_light")} />
           </label>
           <label className="block">
-            <span className="mb-1 block font-medium">前沿层模型（总结/综述）</span>
+            <span className="mb-1 block font-medium">{t("settings.modelFrontier")}</span>
             <input className="input font-mono" value={s.model_frontier} onChange={set("model_frontier")} />
           </label>
           <label className="block">
-            <span className="mb-1 block font-medium">初筛相关度阈值（0-1）</span>
+            <span className="mb-1 block font-medium">{t("settings.relevanceThreshold")}</span>
             <input className="input" type="number" step="0.05" min="0" max="1"
               value={s.relevance_threshold} onChange={set("relevance_threshold")} />
           </label>
           <label className="block">
-            <span className="mb-1 block font-medium">简报生成时间（小时，0-23）</span>
+            <span className="mb-1 block font-medium">{t("settings.briefingHour")}</span>
             <input className="input" type="number" min="0" max="23"
               value={s.briefing_hour} onChange={set("briefing_hour")} />
           </label>
         </div>
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={!!s.cache_enabled} onChange={set("cache_enabled")} />
-          启用语义缓存（相同/相近请求直接复用历史结果，省钱）
+          {t("settings.cacheEnabled")}
         </label>
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={!!s.cascade_enabled} onChange={set("cascade_enabled")} />
-          启用模型级联（跨库问答等场景先用轻量层回答，置信度不足才升级前沿层）
+          {t("settings.cascadeEnabled")}
         </label>
         {s.cascade_enabled && (
           <label className="block max-w-xs">
-            <span className="mb-1 block font-medium">级联置信度阈值（0-1，越低越少升级）</span>
+            <span className="mb-1 block font-medium">{t("settings.cascadeThreshold")}</span>
             <input className="input" type="number" step="0.05" min="0" max="1"
               value={s.cascade_confidence_threshold} onChange={set("cascade_confidence_threshold")} />
           </label>
         )}
-        <button className="btn-primary" onClick={save}>保存设置</button>
+        <button className="btn-primary" onClick={save}>{t("settings.save")}</button>
       </div>
     </section>
   );
@@ -219,6 +216,7 @@ function GeneralSection() {
 function NotifySection() {
   const [s, setS] = useState<any>(null);
   const toast = useToast();
+  const { t } = useLang();
 
   const load = () => api("/api/settings").then(setS).catch(() => {});
   useEffect(() => { load(); }, []);
@@ -238,7 +236,7 @@ function NotifySection() {
       if (s.telegram_bot_token) values.telegram_bot_token = s.telegram_bot_token;
       if (s.smtp_password) values.smtp_password = s.smtp_password;
       await put("/api/settings", { values });
-      toast("推送设置已保存", "success");
+      toast(t("settings.notifySaved"), "success");
       load();
     } catch (err: any) { toast(err.message, "error"); }
   }
@@ -255,48 +253,49 @@ function NotifySection() {
 
   return (
     <section className="space-y-3">
-      <h2 className="text-lg font-semibold">推送通知</h2>
-      <p className="text-sm text-slate-500">简报生成、预算熔断时推送到 Telegram 或邮箱，离开网页也能收到。</p>
+      <h2 className="text-lg font-semibold">{t("settings.notifyTitle")}</h2>
+      <p className="text-sm text-slate-500">{t("settings.notifyHint")}</p>
       <div className="card space-y-4 text-sm">
         <label className="flex items-center gap-2 font-medium">
           <input type="checkbox" checked={!!s.notify_telegram_enabled} onChange={set("notify_telegram_enabled")} />
-          启用 Telegram 推送
+          {t("settings.telegramEnable")}
         </label>
         {s.notify_telegram_enabled && (
           <div className="grid gap-3 pl-6 md:grid-cols-2">
             <label className="block">
-              <span className="mb-1 block text-xs text-slate-500">Bot Token（找 @BotFather 申请）</span>
-              <input className="input font-mono" placeholder={s.telegram_bot_token_is_set ? "已配置，留空保持不变" : ""}
+              <span className="mb-1 block text-xs text-slate-500">{t("settings.telegramToken")}</span>
+              <input className="input font-mono" placeholder={s.telegram_bot_token_is_set ? t("settings.configuredKeepBlank") : ""}
                 value={s.telegram_bot_token || ""} onChange={set("telegram_bot_token")} />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs text-slate-500">Chat ID</span>
+              <span className="mb-1 block text-xs text-slate-500">{t("settings.telegramChatId")}</span>
               <input className="input font-mono" value={s.telegram_chat_id || ""} onChange={set("telegram_chat_id")} />
             </label>
           </div>
         )}
         <label className="flex items-center gap-2 font-medium">
           <input type="checkbox" checked={!!s.notify_email_enabled} onChange={set("notify_email_enabled")} />
-          启用邮件推送（SMTP）
+          {t("settings.emailEnable")}
         </label>
         {s.notify_email_enabled && (
           <div className="grid gap-3 pl-6 md:grid-cols-2">
-            <input className="input" placeholder="SMTP 服务器，如 smtp.gmail.com" value={s.smtp_host || ""} onChange={set("smtp_host")} />
-            <input className="input" type="number" placeholder="端口（587）" value={s.smtp_port || 587} onChange={set("smtp_port")} />
-            <input className="input" placeholder="用户名" value={s.smtp_user || ""} onChange={set("smtp_user")} />
-            <input className="input" type="password" placeholder={s.smtp_password_is_set ? "已配置，留空保持不变" : "密码/App Password"}
+            <input className="input" placeholder={t("settings.smtpHost")} value={s.smtp_host || ""} onChange={set("smtp_host")} />
+            <input className="input" type="number" placeholder={t("settings.smtpPort")} value={s.smtp_port || 587} onChange={set("smtp_port")} />
+            <input className="input" placeholder={t("settings.smtpUser")} value={s.smtp_user || ""} onChange={set("smtp_user")} />
+            <input className="input" type="password"
+              placeholder={s.smtp_password_is_set ? t("settings.configuredKeepBlank") : t("settings.smtpPassword")}
               value={s.smtp_password || ""} onChange={set("smtp_password")} />
-            <input className="input" placeholder="发件地址" value={s.smtp_from || ""} onChange={set("smtp_from")} />
-            <input className="input" placeholder="收件地址" value={s.smtp_to || ""} onChange={set("smtp_to")} />
+            <input className="input" placeholder={t("settings.smtpFrom")} value={s.smtp_from || ""} onChange={set("smtp_from")} />
+            <input className="input" placeholder={t("settings.smtpTo")} value={s.smtp_to || ""} onChange={set("smtp_to")} />
           </div>
         )}
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={!!s.notify_on_budget_cutoff} onChange={set("notify_on_budget_cutoff")} />
-          预算熔断时也推送（强烈建议开启，避免任务静默挂起没人知道）
+          {t("settings.notifyOnCutoff")}
         </label>
         <div className="flex gap-2">
-          <button className="btn-primary" onClick={save}>保存</button>
-          <button className="btn-ghost" onClick={testNotify}>发送测试推送</button>
+          <button className="btn-primary" onClick={save}>{t("settings.save")}</button>
+          <button className="btn-ghost" onClick={testNotify}>{t("settings.testNotify")}</button>
         </div>
       </div>
     </section>
@@ -307,6 +306,7 @@ function NotifySection() {
 function ZoteroSection() {
   const [s, setS] = useState<any>(null);
   const toast = useToast();
+  const { t } = useLang();
   useEffect(() => { api("/api/settings").then(setS).catch(() => {}); }, []);
   if (!s) return null;
 
@@ -317,7 +317,7 @@ function ZoteroSection() {
       };
       if (s.zotero_api_key) values.zotero_api_key = s.zotero_api_key;
       await put("/api/settings", { values });
-      toast("Zotero 配置已保存", "success");
+      toast(t("settings.zoteroSaved"), "success");
     } catch (err: any) { toast(err.message, "error"); }
   }
 
@@ -325,29 +325,27 @@ function ZoteroSection() {
 
   return (
     <section className="space-y-3">
-      <h2 className="text-lg font-semibold">Zotero 同步</h2>
-      <p className="text-sm text-slate-500">
-        单向推送：在知识库页把归档论文一键推入你的 Zotero 文献库。API Key 在 Zotero 设置 → Security 里生成。
-      </p>
+      <h2 className="text-lg font-semibold">{t("settings.zoteroTitle")}</h2>
+      <p className="text-sm text-slate-500">{t("settings.zoteroHint")}</p>
       <div className="card grid gap-3 text-sm md:grid-cols-2">
         <label className="block">
-          <span className="mb-1 block text-xs text-slate-500">Zotero API Key</span>
-          <input className="input font-mono" placeholder={s.zotero_api_key_is_set ? "已配置，留空保持不变" : ""}
+          <span className="mb-1 block text-xs text-slate-500">{t("settings.zoteroKey")}</span>
+          <input className="input font-mono" placeholder={s.zotero_api_key_is_set ? t("settings.configuredKeepBlank") : ""}
             value={s.zotero_api_key || ""} onChange={set("zotero_api_key")} />
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs text-slate-500">Library ID</span>
+          <span className="mb-1 block text-xs text-slate-500">{t("settings.zoteroLibraryId")}</span>
           <input className="input font-mono" value={s.zotero_library_id || ""} onChange={set("zotero_library_id")} />
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs text-slate-500">Library 类型</span>
+          <span className="mb-1 block text-xs text-slate-500">{t("settings.zoteroType")}</span>
           <select className="input" value={s.zotero_library_type || "user"} onChange={set("zotero_library_type")}>
-            <option value="user">个人库（user）</option>
-            <option value="group">团队库（group）</option>
+            <option value="user">{t("settings.zoteroUser")}</option>
+            <option value="group">{t("settings.zoteroGroup")}</option>
           </select>
         </label>
         <div className="flex items-end">
-          <button className="btn-primary" onClick={save}>保存</button>
+          <button className="btn-primary" onClick={save}>{t("settings.save")}</button>
         </div>
       </div>
     </section>
@@ -360,6 +358,7 @@ function UsersSection() {
   const [name, setName] = useState("");
   const [role, setRole] = useState("member");
   const toast = useToast();
+  const { t } = useLang();
 
   const load = () => api("/api/users").then(setUsers).catch(() => {});
   useEffect(() => { load(); }, []);
@@ -369,7 +368,7 @@ function UsersSection() {
     if (!name.trim()) return;
     try {
       const r = await post("/api/users", { name, role });
-      toast(`已创建 ${r.name}，临时密码：${r.temp_password}（请截图告知对方）`, "success");
+      toast(`${r.name} · temp password: ${r.temp_password}`, "success");
       setName("");
       load();
     } catch (err: any) { toast(err.message, "error"); }
@@ -377,15 +376,15 @@ function UsersSection() {
 
   return (
     <section className="space-y-3">
-      <h2 className="text-lg font-semibold">用户管理（管理员）</h2>
+      <h2 className="text-lg font-semibold">{t("settings.usersTitle")}</h2>
       <form onSubmit={create} className="card flex flex-col gap-2 md:flex-row">
-        <input className="input flex-1" placeholder="用户名" value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="input flex-1" placeholder={t("settings.usersNamePlaceholder")} value={name} onChange={(e) => setName(e.target.value)} />
         <select className="input md:w-40" value={role} onChange={(e) => setRole(e.target.value)}>
-          <option value="member">member（可下任务）</option>
-          <option value="viewer">viewer（只读）</option>
-          <option value="admin">admin（全权限）</option>
+          <option value="member">{t("settings.roleMember")}</option>
+          <option value="viewer">{t("settings.roleViewer")}</option>
+          <option value="admin">{t("settings.roleAdmin")}</option>
         </select>
-        <button className="btn-primary justify-center">创建账号</button>
+        <button className="btn-primary justify-center">{t("settings.usersCreate")}</button>
       </form>
       <div className="space-y-2">
         {users.map((u) => (
@@ -394,15 +393,15 @@ function UsersSection() {
             <div className="flex items-center gap-2">
               <select className="input w-36" value={u.role}
                 onChange={(e) => put(`/api/users/${u.id}/role`, { role: e.target.value })
-                  .then(() => { toast("角色已更新", "success"); load(); })
+                  .then(() => { toast(t("settings.roleUpdated"), "success"); load(); })
                   .catch((err) => toast(err.message, "error"))}>
                 <option value="member">member</option>
                 <option value="viewer">viewer</option>
                 <option value="admin">admin</option>
               </select>
               <button className="btn-ghost text-xs text-red-600"
-                onClick={() => del(`/api/users/${u.id}`).then(() => { toast("已删除用户", "info"); load(); })}>
-                删除
+                onClick={() => del(`/api/users/${u.id}`).then(() => { toast(t("settings.userDeleted"), "info"); load(); })}>
+                {t("settings.usersDelete")}
               </button>
             </div>
           </div>
@@ -417,24 +416,25 @@ function PasswordSection() {
   const [oldPw, setOldPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const toast = useToast();
+  const { t } = useLang();
 
   async function change(e: React.FormEvent) {
     e.preventDefault();
     try {
       await post("/api/auth/change-password", { old_password: oldPw, new_password: newPw });
-      toast("密码已修改", "success"); setOldPw(""); setNewPw("");
+      toast(t("settings.passwordChanged"), "success"); setOldPw(""); setNewPw("");
     } catch (err: any) { toast(err.message, "error"); }
   }
 
   return (
     <section className="space-y-3">
-      <h2 className="text-lg font-semibold">账号</h2>
+      <h2 className="text-lg font-semibold">{t("settings.accountTitle")}</h2>
       <form onSubmit={change} className="card flex flex-col gap-2 md:flex-row">
-        <input className="input" type="password" placeholder="原密码" value={oldPw}
+        <input className="input" type="password" placeholder={t("settings.oldPassword")} value={oldPw}
           onChange={(e) => setOldPw(e.target.value)} />
-        <input className="input" type="password" placeholder="新密码（至少 8 位）" value={newPw}
+        <input className="input" type="password" placeholder={t("settings.newPassword")} value={newPw}
           onChange={(e) => setNewPw(e.target.value)} />
-        <button className="btn-primary justify-center">修改密码</button>
+        <button className="btn-primary justify-center">{t("settings.changePassword")}</button>
       </form>
     </section>
   );

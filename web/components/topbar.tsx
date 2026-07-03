@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import Link from "next/link";
 import { api, post } from "@/lib/api";
 import { useEvents } from "./events-provider";
 import { useTheme } from "./theme-provider";
@@ -58,10 +57,9 @@ export function Topbar() {
         <button onClick={toggleLang} className="btn-ghost text-xs" title="切换语言 / Switch language">
           {lang === "zh" ? "EN" : "中"}
         </button>
-        <Link href="/help" className="btn-ghost text-xs" title="使用帮助">? {t("nav.help")}</Link>
         {user && (
           <span className="hidden text-xs text-slate-500 sm:inline">
-            {user.name}{user.role === "admin" ? "（管理员）" : ""}
+            {user.name}{user.role === "admin" ? ` (${t("topbar.admin")})` : ""}
           </span>
         )}
         <button onClick={logout} className="btn-ghost text-xs">{t("topbar.logout")}</button>

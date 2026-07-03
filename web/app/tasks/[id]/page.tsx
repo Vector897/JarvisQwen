@@ -8,6 +8,7 @@ import { api, post, fmtEta, fmtTime, STATUS_LABEL } from "@/lib/api";
 import { useEvents } from "@/components/events-provider";
 import { useToast } from "@/components/toast";
 import { Skeleton } from "@/components/ui";
+import { useLang } from "@/lib/i18n";
 
 const NODE_COLOR: Record<string, string> = {
   done: "#10b981",
@@ -24,6 +25,7 @@ export default function TaskDetail() {
   const [sub, setSub] = useState("");
   const { subscribe } = useEvents();
   const toast = useToast();
+  const { t } = useLang();
 
   const load = useCallback(() => api(`/api/tasks/${id}`).then(setTask).catch(() => {}), [id]);
 
@@ -66,10 +68,10 @@ export default function TaskDetail() {
 
       <div className="card">
         <div className="mb-1 flex flex-wrap justify-between text-sm">
-          <span>总进度 {Math.round((task.progress || 0) * 100)}%{sub ? ` · ${sub}` : ""}</span>
+          <span>{t("taskDetail.totalProgress")} {Math.round((task.progress || 0) * 100)}%{sub ? ` · ${sub}` : ""}</span>
           <span className="text-slate-500">
             {task.status === "RUNNING" && task.eta_ts ? fmtEta(task.eta_ts) : ""}
-            {task.status === "DONE" ? `完成于 ${fmtTime(task.finished_at)}` : ""}
+            {task.status === "DONE" ? `${t("taskDetail.finishedAt")} ${fmtTime(task.finished_at)}` : ""}
           </span>
         </div>
         <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
@@ -88,14 +90,14 @@ export default function TaskDetail() {
       <div className="flex gap-2">
         {["FAILED", "SUSPENDED", "DONE"].includes(task.status) && (
           <button className="btn-primary"
-            onClick={() => post(`/api/tasks/${id}/rerun`, {}).then(() => { toast("已从检查点重新排队", "success"); load(); })}>
-            从检查点重跑
+            onClick={() => post(`/api/tasks/${id}/rerun`, {}).then(() => { toast(t("taskDetail.requeued"), "success"); load(); })}>
+            {t("taskDetail.rerun")}
           </button>
         )}
         {["QUEUED", "SUSPENDED", "WAITING_APPROVAL"].includes(task.status) && (
           <button className="btn-ghost"
-            onClick={() => post(`/api/tasks/${id}/cancel`, {}).then(() => { toast("任务已取消", "info"); load(); })}>
-            取消任务
+            onClick={() => post(`/api/tasks/${id}/cancel`, {}).then(() => { toast(t("taskDetail.cancelled"), "info"); load(); })}>
+            {t("taskDetail.cancel")}
           </button>
         )}
       </div>
@@ -106,7 +108,7 @@ export default function TaskDetail() {
         </div>
       )}
 
-      <h2 className="text-lg font-semibold">产出物（Artifacts）</h2>
+      <h2 className="text-lg font-semibold">{t("taskDetail.artifacts")}</h2>
       <div className="space-y-2">
         {task.artifacts.map((a: any, i: number) => (
           <details key={i} className="card">
@@ -118,7 +120,7 @@ export default function TaskDetail() {
             </pre>
           </details>
         ))}
-        {task.artifacts.length === 0 && <p className="text-sm text-slate-400">暂无产出物。</p>}
+        {task.artifacts.length === 0 && <p className="text-sm text-slate-400">{t("taskDetail.noArtifacts")}</p>}
       </div>
     </div>
   );
