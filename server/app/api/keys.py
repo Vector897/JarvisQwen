@@ -30,7 +30,7 @@ def add_key(body: KeyIn, user: User = Depends(current_user), db: Session = Depen
     provider = body.provider or providers.detect_provider(key, body.base_url)
     if not provider:
         return {"need_provider": True, "normalized": providers.mask(key),
-                "message": "无法自动识别厂商（OpenAI 与 DeepSeek 前缀相同），请手动选择后重试",
+                "message": "无法自动识别厂商（Qwen / OpenAI / DeepSeek 前缀相同），请手动选择后重试",
                 "options": providers.PROVIDERS}
     if provider not in providers.PROVIDERS:
         raise HTTPException(400, f"未知厂商：{provider}")

@@ -1,7 +1,7 @@
 {
-  "name": "AAOS 控制台",
-  "short_name": "AAOS",
-  "description": "AI Agent Operating System",
+  "name": "JarvisQwen Console",
+  "short_name": "JarvisQwen",
+  "description": "JarvisQwen — a 24/7 autonomous research autopilot on Qwen Cloud",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#f8fafc",

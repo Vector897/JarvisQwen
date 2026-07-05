@@ -1,75 +1,159 @@
-# AAOS — AI Agent Operating System
+# JarvisQwen — Your 24/7 Research Autopilot on Qwen Cloud
 
-云边协同的 Agent 控制平面：一个跑在免费 CPU 云主机上的 7×24 调度守护进程，替你指挥昂贵的云端大模型完成学术文献的检索、归档、总结与简报，而调度本身几乎零成本。
+> **Track: Autopilot Agent** · Global AI Hackathon (Qwen Cloud) · [中文文档 →](README.zh.md)
 
-**控制平面（便宜、常驻）管理执行平面（昂贵、按需）** ——类比 Kubernetes 之于容器。
+**JarvisQwen is an autonomous agent that monitors, triages, deep-reads, archives, and briefs the world's research for you — end to end, around the clock — while you sleep.** It orchestrates the entire Qwen model family (`qwen3.6-flash` → `qwen3.7-plus` → `qwen3.7-max`) through a cost-aware three-tier router, so every token is spent on the *cheapest model that can do the job*.
 
-## 核心特性
+Most hackathon agents are demos you babysit. JarvisQwen is built to pass a harder test: **can you leave it alone for a month?** Hard budget cutoffs, crash-safe checkpoints, circuit breakers, PII redaction, human-in-the-loop approvals, and a full audit trail say yes.
 
-- 🔁 **7×24 无人值守**：订阅关键词后自动轮询 arXiv → 去重 → 初筛 → 下载归档 → 深度总结 → 晨间简报，你的笔记本可以关机
-- 💰 **成本控制**：三级模型路由（规则层 0 成本 / 轻量层 / 前沿层）+ 语义缓存 + 日预算硬熔断 + 每笔调用审计记账
-- 🔌 **BYOK**：粘贴任意厂商 API Key 即可运行（自动格式修正、厂商识别、实时探活）；支持任意 OpenAI 兼容端点
-- 🧯 **弹性容错**：检查点断点续跑（崩溃不重复付费）、指数退避+断路器+模型 fallback 链、僵尸任务看门狗
-- 🔒 **安全**：出境 PII 脱敏网关（占位符替换回程还原）、提示注入隔离、append-only 审计日志、Key 加密存储
-- ✅ **人类在环**：高危操作进审批队列，批准后从检查点无缝继续
-- 📱 **随处可用**：响应式 Web 控制台（React Flow 流水线视图 + 进度条 + ETA），前端可托管 Vercel，手机可用
-
-## 快速开始
-
-### 方式一：一键部署到云 VM（推荐）
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Vector897/AAOS/main/install.sh | bash
+```
+You subscribe to a topic once.
+Every morning, a briefing of what actually matters is waiting for you.
+Total cost: about the price of a coffee — per month, not per day.
 ```
 
-浏览器打开 `http://<VM IP>:3000` → 用 `data/admin_password.txt` 里的密码登录 → 设置页粘贴 API Key → 订阅页添加研究关键词。完成。
+---
 
-### 方式二：本地开发
+## The problem
+
+arXiv alone publishes **500+ papers a day**. Every researcher, analyst, and R&D team runs the same manual loop: search → skim → judge relevance → download → read → summarize → repeat tomorrow. It consumes 1–2 hours daily, and the moment you stop, you fall behind.
+
+Naively automating this with a frontier LLM is worse: feeding 200 papers/day through a top-tier model costs **$10+/day**, and a single crashed run can silently re-bill everything.
+
+## What JarvisQwen does
+
+One subscription triggers a fully autonomous, self-correcting pipeline:
+
+```
+📡 Poll arXiv/Semantic Scholar   (pure code, $0)
+ → 🧹 Dedupe by title+ID fingerprint   (pure code, $0)
+ → 🎯 Relevance triage against your research profile   (qwen3.6-flash)
+ → 📥 Download PDF + archive with metadata   (pure code, $0)
+ → 📝 Deep per-paper summary: contributions, methods, relation to YOUR work   (qwen3.7-max)
+ → 🧠 Write episodic memory → nightly consolidation into semantic memory   (qwen3.6-flash, off-peak)
+ → 📰 Morning briefing pushed to web console / Telegram / email
+ → 👍 Your "important / ignore" feedback loops back into future triage
+```
+
+4 of the 8 stages cost exactly $0. The expensive model only ever sees the few papers that survive triage.
+
+### The cost math (real Qwen Cloud pricing)
+
+| Stage | Model | Price (in/out per MTok) | Typical daily cost* |
+|---|---|---|---|
+| Poll / dedupe / archive / push | — (rule tier, pure code) | $0 | $0 |
+| Triage 50 new papers | `qwen3.6-flash` | $0.25 / $1.50 | ~$0.03 |
+| Deep-summarize the ~5 that matter | `qwen3.7-max` | $2.50 / $7.50 | ~$0.26 |
+| Briefing + memory consolidation | `qwen3.6-flash` | $0.25 / $1.50 | ~$0.01 |
+| **Total** | | | **~$0.30/day** |
+
+*Tracking one active topic. A naive "frontier-model-reads-everything" design costs ~$10/day for the same coverage — **JarvisQwen is ~30× cheaper** at equal quality where quality matters.
+
+Semantic caching (72h TTL) and confidence-based cascading (flash answers first, self-scores, escalates to max only below threshold) cut this further.
+
+## Why you can actually leave it alone
+
+This is the part that makes it an *autopilot* rather than a demo:
+
+| Guarantee | Mechanism |
+|---|---|
+| **Never blows your budget** | Daily budget cap: alert at 80%, hard circuit-break at 100% — running tasks suspend instead of burning money. Every call is metered against the official Qwen price table ([`policy.py`](server/app/core/router/policy.py)). |
+| **Never pays twice** | Every pipeline step checkpoints its state. Crash, reboot, or network loss → resume from the last checkpoint. Paid intermediate results are never recomputed. |
+| **Never melts down retrying** | Exponential backoff with jitter, per-provider circuit breakers, and model fallback chains (`max → plus → flash`). Zombie tasks are reaped by a watchdog and re-queued. |
+| **Never leaks your data** | An egress redaction gateway (regex → entropy → NER, three layers) replaces PII/keys with placeholders before anything leaves the box, and restores them on return. High-sensitivity mode blocks egress outright. |
+| **Never acts beyond its authority** | Destructive/outbound operations queue for human approval; approved tasks resume seamlessly from checkpoint. Prompt-injection isolation wraps all external content as "data, not instructions". |
+| **Never lies about what it did** | Append-only audit log of every call: model, tokens, cost, input/output digests. Any conclusion traces back to the exact call that produced it. |
+
+## Architecture
+
+**Control plane / execution plane separation** — a cheap, always-on scheduler (runs on a 1-core CPU VM) commands expensive, on-demand Qwen models. Think Kubernetes vs. containers.
+
+```mermaid
+flowchart TB
+    subgraph clients["Any device — laptop / phone / tablet"]
+        B["Web console (Next.js PWA)<br/>pipeline DAG · budgets · approvals · briefings"]
+    end
+
+    subgraph cp["Control plane — cheap CPU VM on Alibaba Cloud ECS"]
+        GW["FastAPI gateway"]
+        SCHED["Scheduler<br/>queue · leases · watchdog · cron polling"]
+        ENGINE["Task engine<br/>checkpoints · artifacts · ETA · HITL interrupts"]
+        LLM["llm.py — single egress point<br/>redact → cache → budget → route → resilience → audit"]
+        MEM["Memory<br/>episodic → nightly consolidation → semantic"]
+        DB[("SQLite<br/>tasks · papers · memory · audit")]
+    end
+
+    subgraph qwen["Execution plane — Qwen Cloud (OpenAI-compatible API)"]
+        FLASH["qwen3.6-flash<br/>triage · briefing · NLU<br/>$0.25/MTok"]
+        PLUS["qwen3.7-plus<br/>fallback tier<br/>$0.40/MTok"]
+        MAX["qwen3.7-max<br/>deep summaries · reviews<br/>$2.50/MTok"]
+    end
+
+    ARXIV["arXiv / Semantic Scholar<br/>(free public APIs)"]
+
+    B -- HTTPS --> GW
+    GW --> SCHED --> ENGINE --> LLM
+    ENGINE --> MEM
+    SCHED --> ARXIV
+    ENGINE --- DB
+    LLM -- "light tier" --> FLASH
+    LLM -- "fallback" --> PLUS
+    LLM -- "frontier tier, only when needed" --> MAX
+```
+
+Every LLM request in the system flows through **one** choke point — [`server/app/core/router/llm.py`](server/app/core/router/llm.py) — where six stages are applied in order: **redaction → semantic cache → budget guard → tier routing → resilient call (backoff / breaker / fallback) → audit accounting**. No prompt can bypass safety or metering by construction.
+
+### Qwen Cloud integration points
+
+| Concern | Where |
+|---|---|
+| OpenAI-compatible endpoint (`dashscope-intl.aliyuncs.com/compatible-mode/v1`) | [`providers.py`](server/app/core/router/providers.py) — `QWEN_BASE_URL`, `litellm_route()` |
+| Default three-tier routing over the Qwen family | [`settings_store.py`](server/app/core/settings_store.py) |
+| Exact per-call cost accounting at official Qwen prices | [`policy.py`](server/app/core/router/policy.py) — `QWEN_PRICING`, `exact_cost()` |
+| Key validation live-probe against `qwen3.6-flash` | [`providers.py`](server/app/core/router/providers.py) — `probe()` |
+| Confidence cascade (flash first, escalate to max) | [`cascade.py`](server/app/core/router/cascade.py) |
+
+## Quickstart
+
+### 1. Local (60 seconds, zero keys needed)
 
 ```bash
-# 后端
+# backend
 cd server
 python -m venv .venv && .venv/bin/pip install -e ".[dev]" litellm
-.venv/bin/uvicorn app.main:app --reload   # http://localhost:8000
+.venv/bin/uvicorn app.main:app --reload        # http://localhost:8000
 
-# 前端（另一个终端）
+# frontend (second terminal)
 cd web
-npm install && npm run dev                # http://localhost:3000
+npm install && npm run dev                     # http://localhost:3000
 ```
 
-未配置 API Key 时系统运行在 **dry-run 模式**：全流程可跑通，LLM 返回模拟响应，零费用。
+With no API key configured the system runs in **dry-run mode**: the full pipeline executes with simulated LLM responses at zero cost. Paste a [Qwen Cloud API key](https://docs.qwencloud.com/developer-guides/administration/api-keys) in **Settings** to go live — it is auto-normalized, provider-detected, live-probed, and stored Fernet-encrypted.
 
-### 方式三：前端上 Vercel（手机公网访问最方便）
+### 2. Alibaba Cloud ECS (production)
 
-1. Fork 本仓库，Vercel 导入并把 Root Directory 设为 `web/`
-2. Vercel 环境变量设 `BACKEND_URL=https://你的VM域名`（VM 上只跑 `server`）
-3. push 即部署；数据与 Key 始终在你自己的 VM 上
-
-## 架构
-
-```
-浏览器（任意设备） ── HTTPS ──> Next.js 控制台
-                                    │ /api/* rewrites（同源）
-                              FastAPI 控制平面（免费 CPU VM）
-                              ├─ 调度器：队列/租约/看门狗/订阅轮询
-                              ├─ 任务引擎：检查点续跑/ETA/Artifacts/审批中断
-                              ├─ llm.py 统一出境调用点：
-                              │    脱敏→缓存→预算→路由→弹性(退避/断路器/fallback)→审计
-                              └─ SQLite（任务/论文/记忆/审计，单文件可迁移）
-                                    │ 仅在必要时刻
-                              云端大模型 API（Claude / GPT / Gemini / DeepSeek / 自定义端点）
+```bash
+curl -fsSL https://raw.githubusercontent.com/Vector897/JarvisQwen/main/install.sh | bash
 ```
 
-详细设计见仓库外的《项目架构.md》《项目代码架构.md》（调研报告映射、六大功能域实现方案）。
+Open `http://<ECS-IP>:3000`, log in with the generated password in `data/admin_password.txt`, paste your `DASHSCOPE_API_KEY`, add a subscription. Done — your first briefing arrives tomorrow morning. All state lives in `./data`; migrating hosts is copy-and-compose-up.
 
-## 测试
+## Console
+
+Responsive Next.js PWA (add-to-home-screen on mobile): live pipeline DAG per task (React Flow, color-coded steps, ETA), cost dashboard with budget progress, subscription manager, searchable knowledge library with cross-paper QA, approval inbox, audit trail, bilingual UI (EN/中文), dark mode.
+
+## Tests
 
 ```bash
 cd server
-.venv/bin/python -m pytest          # 核心路径单测（路由/脱敏/断路器/检查点/预算）
-.venv/bin/python tests/smoke_e2e.py # 全链路冒烟（启动→登录→任务→流水线→审计）
+.venv/bin/python -m pytest          # routing / redaction / breaker / checkpoint / budget
+.venv/bin/python tests/smoke_e2e.py # boot → login → task → pipeline → audit
 ```
 
-## 许可证
+## Beyond research papers
 
-MIT
+The pipeline is a template, not a hard-code: *poll → filter cheap → act expensive → brief → learn from feedback* generalizes to patent watch, competitor monitoring, regulatory tracking, and security-advisory triage. The task-template system ships with the research vertical as its flagship.
+
+## License
+
+[MIT](LICENSE)

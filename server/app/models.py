@@ -32,7 +32,7 @@ class User(Base):
 class ApiKey(Base):
     __tablename__ = "api_keys"
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=uid)
-    provider: Mapped[str] = mapped_column(String(32))  # anthropic/openai/google/deepseek/openrouter/custom
+    provider: Mapped[str] = mapped_column(String(32))  # qwen/anthropic/openai/google/deepseek/openrouter/custom
     encrypted_key: Mapped[str] = mapped_column(Text)
     base_url: Mapped[str] = mapped_column(String(256), default="")  # custom OpenAI-compatible endpoint
     label: Mapped[str] = mapped_column(String(64), default="")

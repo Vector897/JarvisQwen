@@ -24,7 +24,7 @@ export default function Nav() {
     <>
       {/* 桌面端侧栏 */}
       <nav className="hidden md:flex w-52 shrink-0 flex-col gap-1 border-r border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <Link href="/dashboard" className="mb-4 text-lg font-bold">AAOS</Link>
+        <Link href="/dashboard" className="mb-4 text-lg font-bold">JarvisQwen</Link>
         {items.map(([href, icon, key]) => (
           <Link key={href} href={href}
             className={`rounded-lg px-3 py-2 text-sm transition-colors ${pathname.startsWith(href) ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900" : "hover:bg-slate-100 dark:hover:bg-slate-800"}`}>

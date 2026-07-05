@@ -13,10 +13,14 @@ from sqlalchemy.orm import Session
 from ...config import config
 from ...models import ApiKey
 
-PROVIDERS = ["anthropic", "openai", "google", "deepseek", "openrouter", "custom"]
+PROVIDERS = ["qwen", "anthropic", "openai", "google", "deepseek", "openrouter", "custom"]
+
+# Qwen Cloud（DashScope 国际站）OpenAI 兼容端点——本项目的默认执行平面
+QWEN_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 
 # 厂商 -> LiteLLM 需要的环境变量名
 ENV_VAR = {
+    "qwen": "DASHSCOPE_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
     "openai": "OPENAI_API_KEY",
     "google": "GEMINI_API_KEY",
@@ -61,7 +65,7 @@ def detect_provider(key: str, base_url: str = "") -> str:
     if key.startswith("sk-proj-") or key.startswith("sk-svcacct-"):
         return "openai"
     if key.startswith("sk-") and len(key) >= 35 and len(key) <= 60:
-        return ""  # OpenAI / DeepSeek 前缀相同，需用户确认
+        return ""  # Qwen / OpenAI / DeepSeek 前缀相同，需用户确认
     return ""
 
 
@@ -77,6 +81,7 @@ def probe(provider: str, key: str, base_url: str = "") -> tuple[bool, str]:
         import litellm
 
         model = {
+            "qwen": "openai/qwen3.6-flash",
             "anthropic": "anthropic/claude-haiku-4-5-20251001",
             "openai": "openai/gpt-4o-mini",
             "google": "gemini/gemini-2.0-flash",
@@ -84,6 +89,8 @@ def probe(provider: str, key: str, base_url: str = "") -> tuple[bool, str]:
             "openrouter": "openrouter/openai/gpt-4o-mini",
         }.get(provider, "openai/gpt-4o-mini")
         kwargs: dict = {"api_key": key, "max_tokens": 1, "timeout": 20}
+        if provider == "qwen" and not base_url:
+            base_url = QWEN_BASE_URL
         if base_url:
             kwargs["api_base"] = base_url
             model = "openai/" + model.split("/", 1)[-1]
@@ -113,3 +120,14 @@ def provider_of_model(model: str) -> str:
     """LiteLLM 模型名前缀 -> 厂商。"""
     prefix = model.split("/", 1)[0]
     return {"gemini": "google", "vertex_ai": "google"}.get(prefix, prefix)
+
+
+def litellm_route(model: str, key_row: ApiKey) -> tuple[str, str]:
+    """把内部模型名转成 (LiteLLM 调用名, api_base)。
+
+    qwen/* 走 Qwen Cloud 的 OpenAI 兼容端点（openai/ 前缀 + base_url）；
+    其余厂商用 LiteLLM 原生前缀，api_base 仅在用户自定义端点时设置。
+    """
+    if provider_of_model(model) == "qwen":
+        return "openai/" + model.split("/", 1)[-1], key_row.base_url or QWEN_BASE_URL
+    return model, key_row.base_url or ""

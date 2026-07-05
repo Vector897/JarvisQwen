@@ -1,4 +1,4 @@
-# AAOS 模式 A：全自托管（一台免费 VM 全搞定）
+# JarvisQwen 模式 A：全自托管（一台便宜 VM 全搞定，如阿里云 ECS）
 # 用法：docker compose up -d
 # HTTPS：有域名时解开 caddy 注释并改 Caddyfile 中的域名
 

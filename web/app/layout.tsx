@@ -8,8 +8,8 @@ import { ThemeProvider, THEME_INIT_SCRIPT } from "@/components/theme-provider";
 import { LangProvider } from "@/lib/i18n";
 
 export const metadata: Metadata = {
-  title: "AAOS 控制台",
-  description: "AI Agent Operating System — 云边协同的 Agent 控制平面",
+  title: "JarvisQwen Console",
+  description: "JarvisQwen — a 24/7 autonomous research autopilot on Qwen Cloud",
   manifest: "/manifest.json",
 };
 

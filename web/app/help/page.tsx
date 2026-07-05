@@ -2,7 +2,7 @@
 
 import { useLang } from "@/lib/i18n";
 
-/** 帮助页：讲清 AAOS 如何运作、有哪些防呆机制、名词解释、故障排查。
+/** 帮助页：讲清 JarvisQwen 如何运作、有哪些防呆机制、名词解释、故障排查。
  *  长文档说明，保留中文原文；lang=en 时顶部提示条说明这一范围边界。 */
 
 export default function Help() {
@@ -13,11 +13,11 @@ export default function Help() {
         <div className="card border-amber-300 bg-amber-50 text-sm text-amber-800">{t("help.langNotice")}</div>
       )}
       <section className="card space-y-2">
-        <h2 className="text-lg font-bold">AAOS 是什么</h2>
+        <h2 className="text-lg font-bold">JarvisQwen 是什么</h2>
         <p className="text-sm text-slate-600">
-          AAOS（AI Agent Operating System）是一个<b>云边协同的 Agent 控制平面</b>：一个跑在便宜（甚至免费）云主机上的
-          7×24 调度守护进程，替你指挥昂贵的云端大模型（Claude / GPT / Gemini / DeepSeek）
-          完成学术文献的检索、归档、总结与简报。
+          JarvisQwen 是一个<b>云边协同的 Agent 控制平面</b>：一个跑在便宜（甚至免费）云主机上的
+          7×24 调度守护进程，替你指挥 Qwen Cloud 上的大模型全家桶（qwen3.6-flash / qwen3.7-plus / qwen3.7-max）
+          完成学术文献的检索、归档、总结与简报。也支持 BYOK 接入其他厂商模型。
         </p>
         <p className="text-sm text-slate-600">
           核心思路是<b>「便宜常驻的管家 + 昂贵按需的专家」</b>：轮询、去重、归档这些机械活由本地代码完成（0 费用），
@@ -49,9 +49,9 @@ export default function Help() {
           <Tier color="border-slate-300" name="规则层" cost="0 费用"
             desc="轮询、去重、归档、格式解析——纯 Python 代码，不调用任何模型。" />
           <Tier color="border-blue-300" name="轻量层" cost="很便宜"
-            desc="指令解析、论文初筛、简报撰写——用 Haiku / Gemini Flash 等便宜模型。" />
+            desc="指令解析、论文初筛、简报撰写——用 qwen3.6-flash（$0.25/MTok 输入）。" />
           <Tier color="border-amber-300" name="前沿层" cost="较贵"
-            desc="论文深度总结、综述生成——只在真正需要时用 Claude / GPT 等最强模型。" />
+            desc="论文深度总结、综述生成——只在真正需要时用 qwen3.7-max 最强模型。" />
         </div>
       </section>
 
@@ -96,7 +96,7 @@ export default function Help() {
       <section className="space-y-2">
         <h2 className="text-lg font-bold">首次使用三步</h2>
         <ol className="card list-decimal space-y-1 pl-6 text-sm text-slate-600">
-          <li><b>设置页</b>粘贴一个 API Key（如 Gemini 免费档），保存时会自动校验。</li>
+          <li><b>设置页</b>粘贴一个 API Key（推荐 Qwen Cloud，注册即有免费额度），保存时会自动校验。</li>
           <li><b>设置页</b>填写「我的研究方向」并设置每日预算上限。</li>
           <li><b>订阅页</b>添加研究关键词，或直接在<b>任务页</b>用自然语言下一个任务。</li>
         </ol>

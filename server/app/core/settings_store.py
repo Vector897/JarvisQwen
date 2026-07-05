@@ -17,11 +17,11 @@ DEFAULTS: dict[str, Any] = {
     "cache_ttl_hours": 72,
     "briefing_hour": 7,  # 每天几点生成简报
     "consolidate_hour": 3,  # 记忆整合时间
-    # 三级路由的模型选择（LiteLLM 模型名）
-    "model_light": "gemini/gemini-2.0-flash",
-    "model_light_fallbacks": ["anthropic/claude-haiku-4-5-20251001", "deepseek/deepseek-chat"],
-    "model_frontier": "anthropic/claude-sonnet-5",
-    "model_frontier_fallbacks": ["openai/gpt-5", "gemini/gemini-2.5-pro"],
+    # 三级路由的模型选择——默认 Qwen 全家桶：规则层 $0 → flash 初筛 → max 深度总结
+    "model_light": "qwen/qwen3.6-flash",
+    "model_light_fallbacks": ["qwen/qwen3.7-plus"],
+    "model_frontier": "qwen/qwen3.7-max",
+    "model_frontier_fallbacks": ["qwen/qwen3.7-plus"],
     "max_retries": 3,
     "relevance_threshold": 0.5,  # 论文初筛相关度阈值
     "research_profile": "",  # 用户研究方向描述，用于初筛与总结的上下文

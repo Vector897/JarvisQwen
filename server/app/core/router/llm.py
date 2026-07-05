@@ -46,17 +46,20 @@ def _call_litellm(db: Session, model: str, prompt: str, max_tokens: int) -> tupl
         "max_tokens": max_tokens,
         "timeout": 120,
     }
-    if key_row.base_url:
-        kwargs["api_base"] = key_row.base_url
-    resp = litellm.completion(model=model, messages=[{"role": "user", "content": prompt}], **kwargs)
+    call_model, api_base = providers.litellm_route(model, key_row)
+    if api_base:
+        kwargs["api_base"] = api_base
+    resp = litellm.completion(model=call_model, messages=[{"role": "user", "content": prompt}], **kwargs)
     text = resp.choices[0].message.content or ""
     usage = getattr(resp, "usage", None)
     tin = getattr(usage, "prompt_tokens", 0) or 0
     tout = getattr(usage, "completion_tokens", 0) or 0
-    try:
-        cost = float(litellm.completion_cost(completion_response=resp))
-    except Exception:  # noqa: BLE001
-        cost = policy.estimate_cost(policy.TIER_FRONTIER, len(prompt))
+    cost = policy.exact_cost(model, tin, tout)  # Qwen 官方价目表优先
+    if cost is None:
+        try:
+            cost = float(litellm.completion_cost(completion_response=resp))
+        except Exception:  # noqa: BLE001
+            cost = policy.estimate_cost(policy.TIER_FRONTIER, len(prompt))
     return text, cost, tin, tout
 
 

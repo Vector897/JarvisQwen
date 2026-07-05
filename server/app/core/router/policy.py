@@ -27,5 +27,22 @@ def models_for_tier(db: Session, tier: str) -> list[str]:
 def estimate_cost(tier: str, prompt_chars: int) -> float:
     """出境前的粗略成本预估（供预算检查用），按字符数近似 token。"""
     tokens = prompt_chars / 3
-    per_mtok = {TIER_LIGHT: 0.3, TIER_FRONTIER: 5.0}.get(tier, 0.3)
+    per_mtok = {TIER_LIGHT: 0.9, TIER_FRONTIER: 5.0}.get(tier, 0.9)
     return tokens / 1_000_000 * per_mtok * 2  # 输入+输出粗估
+
+
+# Qwen Cloud 官方定价（USD / 1M tokens，≤256K 档，来源 docs.qwencloud.com pricing）
+QWEN_PRICING: dict[str, tuple[float, float]] = {
+    "qwen3.7-max": (2.50, 7.50),
+    "qwen3.7-plus": (0.40, 1.60),
+    "qwen3.6-flash": (0.25, 1.50),
+}
+
+
+def exact_cost(model: str, tokens_in: int, tokens_out: int) -> float | None:
+    """按官方价目表精确计价；未收录的模型返回 None（回退到 LiteLLM 或粗估）。"""
+    name = model.split("/", 1)[-1]
+    price = QWEN_PRICING.get(name)
+    if price is None:
+        return None
+    return tokens_in / 1_000_000 * price[0] + tokens_out / 1_000_000 * price[1]

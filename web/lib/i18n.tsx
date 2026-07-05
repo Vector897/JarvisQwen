@@ -111,7 +111,7 @@ const DICT = {
     "settings.accountTitle": "账号", "settings.oldPassword": "原密码", "settings.newPassword": "新密码（至少 8 位）",
     "settings.changePassword": "修改密码", "settings.passwordChanged": "密码已修改",
 
-    "login.title": "登录 AAOS", "login.hint": "首次部署的初始密码在服务器 data/admin_password.txt",
+    "login.title": "登录 JarvisQwen", "login.hint": "首次部署的初始密码在服务器 data/admin_password.txt",
     "login.username": "用户名", "login.password": "密码", "login.submit": "登录",
 
     "help.langNotice": "帮助页目前仅提供中文说明文档，界面切换不影响本页内容。",
@@ -217,7 +217,7 @@ const DICT = {
     "settings.accountTitle": "Account", "settings.oldPassword": "Current password", "settings.newPassword": "New password (8+ chars)",
     "settings.changePassword": "Change password", "settings.passwordChanged": "Password changed",
 
-    "login.title": "Sign in to AAOS", "login.hint": "The initial password is in data/admin_password.txt on the server",
+    "login.title": "Sign in to JarvisQwen", "login.hint": "The initial password is in data/admin_password.txt on the server",
     "login.username": "Username", "login.password": "Password", "login.submit": "Sign in",
 
     "help.langNotice": "The Help page is currently Chinese-only documentation; the language toggle doesn't affect this content.",

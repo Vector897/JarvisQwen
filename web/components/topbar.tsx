@@ -35,7 +35,7 @@ export function Topbar() {
 
   if (pathname === "/login") return null;
   const titlePair = Object.entries(TITLES).find(([p]) => pathname.startsWith(p))?.[1];
-  const title = titlePair ? (lang === "zh" ? titlePair[0] : titlePair[1]) : "AAOS";
+  const title = titlePair ? (lang === "zh" ? titlePair[0] : titlePair[1]) : "JarvisQwen";
   const [dotCls, dotKey] = DOT[status] as [string, "topbar.online" | "topbar.offline"];
 
   async function logout() {

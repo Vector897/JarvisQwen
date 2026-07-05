@@ -6,6 +6,7 @@ import { useToast } from "@/components/toast";
 import { useLang } from "@/lib/i18n";
 
 const PROVIDER_LABEL: Record<string, string> = {
+  qwen: "Qwen Cloud (DashScope)",
   anthropic: "Anthropic (Claude)",
   openai: "OpenAI (GPT)",
   google: "Google (Gemini)",
@@ -174,12 +175,17 @@ function GeneralSection() {
           </label>
           <label className="block">
             <span className="mb-1 block font-medium">{t("settings.modelLight")}</span>
-            <input className="input font-mono" value={s.model_light} onChange={set("model_light")} />
+            <input className="input font-mono" list="qwen-models" value={s.model_light} onChange={set("model_light")} />
           </label>
           <label className="block">
             <span className="mb-1 block font-medium">{t("settings.modelFrontier")}</span>
-            <input className="input font-mono" value={s.model_frontier} onChange={set("model_frontier")} />
+            <input className="input font-mono" list="qwen-models" value={s.model_frontier} onChange={set("model_frontier")} />
           </label>
+          <datalist id="qwen-models">
+            <option value="qwen/qwen3.6-flash">Qwen3.6 Flash — $0.25/$1.5 per MTok</option>
+            <option value="qwen/qwen3.7-plus">Qwen3.7 Plus — $0.4/$1.6 per MTok</option>
+            <option value="qwen/qwen3.7-max">Qwen3.7 Max — $2.5/$7.5 per MTok</option>
+          </datalist>
           <label className="block">
             <span className="mb-1 block font-medium">{t("settings.relevanceThreshold")}</span>
             <input className="input" type="number" step="0.05" min="0" max="1"

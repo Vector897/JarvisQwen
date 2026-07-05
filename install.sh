@@ -1,31 +1,31 @@
 #!/usr/bin/env bash
-# AAOS 一键安装（Ubuntu/Debian VM，如 Oracle Cloud Free A1）
-# 用法：curl -fsSL https://raw.githubusercontent.com/Vector897/AAOS/main/install.sh | bash
+# JarvisQwen one-click install (Ubuntu/Debian VM, e.g. Alibaba Cloud ECS)
+# Usage: curl -fsSL https://raw.githubusercontent.com/Vector897/JarvisQwen/main/install.sh | bash
 set -euo pipefail
 
-echo "==> AAOS 一键安装"
+echo "==> JarvisQwen installer"
 
 if ! command -v docker >/dev/null 2>&1; then
-  echo "==> 安装 Docker..."
+  echo "==> Installing Docker..."
   curl -fsSL https://get.docker.com | sh
   sudo usermod -aG docker "$USER" || true
 fi
 
-if [ ! -d AAOS ]; then
-  echo "==> 克隆仓库..."
-  git clone https://github.com/Vector897/AAOS.git
+if [ ! -d JarvisQwen ]; then
+  echo "==> Cloning repository..."
+  git clone https://github.com/Vector897/JarvisQwen.git
 fi
-cd AAOS
+cd JarvisQwen
 
-echo "==> 构建并启动（首次约 3-5 分钟）..."
+echo "==> Building and starting (first run takes 3-5 min)..."
 sudo docker compose up -d --build
 
 echo ""
 echo "=============================================="
-echo " AAOS 已启动！"
-echo "   控制台:  http://$(hostname -I | awk '{print $1}'):3000"
-echo "   初始密码: 稍后查看 ./data/admin_password.txt"
-echo "   （容器首次启动后生成，运行: sudo cat data/admin_password.txt）"
+echo " JarvisQwen is up!"
+echo "   Console:  http://$(hostname -I | awk '{print $1}'):3000"
+echo "   Password: generated on first boot, run: sudo cat data/admin_password.txt"
 echo ""
-echo " 下一步：浏览器打开控制台 → 登录 → 设置页粘贴 API Key → 订阅页添加研究关键词"
+echo " Next: open the console -> log in -> paste your Qwen Cloud API key in Settings"
+echo "       -> add research keywords in Subscriptions"
 echo "=============================================="
