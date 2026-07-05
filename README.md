@@ -2,6 +2,8 @@
 
 > **Track: Autopilot Agent** · Global AI Hackathon (Qwen Cloud) · [中文文档 →](README.zh.md)
 
+![JarvisQwen Demo](./JQ.gif)
+
 Most of knowledge work follows one loop: **watch sources → triage what matters → process it deeply → deliver a briefing → learn from feedback.** Researchers run it over papers. Analysts run it over competitor moves. Legal teams run it over regulations. Security teams run it over CVE advisories. Everyone runs it by hand, every day, forever.
 
 **JarvisQwen turns that loop into an autonomous, production-grade autopilot** on the Qwen model family — with a cost-aware three-tier router (`$0 rules → qwen3.6-flash → qwen3.7-max`) so every token is spent on the *cheapest model that can do the job*, and with the operational guarantees that let you leave it running unattended: hard budget cutoffs, crash-safe checkpoints, circuit breakers, PII redaction, human-in-the-loop approvals, and a full audit trail.
