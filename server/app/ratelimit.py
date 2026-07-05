@@ -4,14 +4,20 @@ SSE 长连接。
 
 与 core/scheduler/ratelimit.py 无关——那个是约束**出站** LLM 调用的令牌桶；
 本模块约束的是**入站** HTTP 请求量。
+
+超限事件（429）会被记入 ./data/ratelimit.log，用于监测公网扫描/攻击。
 """
 from __future__ import annotations
 
+import json
 import time
+from datetime import datetime
 from threading import Lock
 
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
+
+from .config import config
 
 _WINDOW = 60.0  # 秒；固定窗口长度
 
@@ -36,7 +42,7 @@ class RateLimitMiddleware:
         self._hits: dict[str, tuple[float, int]] = {}
         self._lock = Lock()
 
-    def _check(self, ip: str) -> int:
+    def _check(self, ip: str, path: str = "") -> int:
         """返回本窗口内该 IP 的累计请求数（含本次）。"""
         now = time.monotonic()
         with self._lock:
@@ -48,7 +54,27 @@ class RateLimitMiddleware:
             if len(self._hits) > 10_000:  # 顺手驱逐过期条目，防内存无限增长
                 cutoff = now - _WINDOW
                 self._hits = {k: v for k, v in self._hits.items() if v[0] >= cutoff}
+
+            # 超限时写日志
+            if count > self.rpm:
+                self._log_throttle(ip, path, count)
             return count
+
+    def _log_throttle(self, ip: str, path: str, count: int) -> None:
+        """记录限流事件到 ./data/ratelimit.log（便于监测扫描/攻击）。"""
+        try:
+            logfile = config.data_dir / "ratelimit.log"
+            event = {
+                "ts": datetime.utcnow().isoformat() + "Z",
+                "ip": ip,
+                "path": path,
+                "request_count": count,
+                "limit": self.rpm,
+            }
+            with open(logfile, "a") as f:
+                f.write(json.dumps(event, ensure_ascii=False) + "\n")
+        except Exception:
+            pass  # 日志写失败不应该影响请求
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -58,7 +84,8 @@ class RateLimitMiddleware:
         if any(path.startswith(p) for p in self.exempt):
             await self.app(scope, receive, send)
             return
-        if self._check(_client_ip(scope)) > self.rpm:
+        ip = _client_ip(scope)
+        if self._check(ip, path) > self.rpm:
             resp = JSONResponse(
                 {"detail": "Too many requests, slow down."},
                 status_code=429,
