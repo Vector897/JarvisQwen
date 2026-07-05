@@ -10,6 +10,7 @@ services:
       - ./data:/srv/data
     environment:
       - AAOS_DATA_DIR=/srv/data
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}  # 根目录 .env 中配置，启动时自动入库
     ports:
       - "8000:8000"
 

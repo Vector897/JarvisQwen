@@ -15,6 +15,7 @@ from .api import auth_api, events, keys, misc, tasks, users
 from .auth import ensure_admin_user
 from .config import config
 from .core.engine import graphs  # noqa: F401  导入即注册任务图
+from .core.router import providers
 from .core.scheduler import runner
 from .db import init_db
 
@@ -26,6 +27,7 @@ async def lifespan(app: FastAPI):
     config.ensure_dirs()
     init_db()
     ensure_admin_user()
+    providers.import_env_keys()  # .env 里有 DASHSCOPE_API_KEY 时自动入库
     runner.start(_scheduler)  # 工作线程 + 定时作业 + 崩溃任务恢复
     _scheduler.start()
     print(f"[AAOS] v{__version__} 控制平面已启动  http://{config.host}:{config.port}")

@@ -107,6 +107,44 @@ def probe(provider: str, key: str, base_url: str = "") -> tuple[bool, str]:
         return False, f"校验失败：{msg[:160]}"
 
 
+def import_env_keys() -> None:
+    """启动时自动导入环境变量 / .env 中的 DASHSCOPE_API_KEY（云部署零点击配 Key）。
+
+    查找顺序：进程环境变量 → 工作目录 .env → 仓库根 ../.env。
+    已存在等值的 qwen Key 时跳过，不重复入库。
+    """
+    import os
+
+    raw = os.environ.get("DASHSCOPE_API_KEY", "")
+    if not raw:
+        try:
+            from dotenv import dotenv_values
+
+            for env_path in (".env", "../.env"):
+                raw = (dotenv_values(env_path).get("DASHSCOPE_API_KEY") or "").strip()
+                if raw:
+                    break
+        except ImportError:
+            return
+    key = normalize_key(raw or "")
+    if not key or len(key) < 10:
+        return
+
+    from ...db import session
+    from ...models import User
+
+    with session() as db:
+        for row in db.execute(select(ApiKey).where(ApiKey.provider == "qwen")).scalars():
+            if decrypt_key(row.encrypted_key) == key:
+                return  # 同一把 Key 已在库中
+        admin = db.execute(select(User).where(User.role == "admin")).scalars().first()
+        if admin is None:
+            return
+        db.add(ApiKey(provider="qwen", encrypted_key=encrypt_key(key),
+                      label="env:DASHSCOPE_API_KEY", owner_id=admin.id))
+        print(f"[JarvisQwen] 已从环境变量导入 Qwen Cloud API Key（{mask(key)}）")
+
+
 def pick_key(db: Session, provider: str) -> ApiKey | None:
     """按优先级选一个 active 的 Key（断路器把坏 Key 置为 broken/rate_limited）。"""
     return db.execute(
