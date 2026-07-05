@@ -26,3 +26,15 @@ admin_password.txt
 Thumbs.db
 .idea/
 .vscode/
+
+# Docs & media stay out of the repo — README is the only committed doc
+*.md
+*.txt
+*.jpg
+*.jpeg
+*.svg
+*.png
+*.pdf
+*.docx
+!README.md
+!README.zh.md
