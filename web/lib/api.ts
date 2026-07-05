@@ -10,7 +10,7 @@ export async function api<T = any>(
     ...options,
   });
   if (res.status === 401 && typeof window !== "undefined" && !path.includes("/auth/")) {
-    window.location.href = "/login";
+    window.location.href = "/home";
     throw new Error("Not signed in");
   }
   if (!res.ok) {

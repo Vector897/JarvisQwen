@@ -71,6 +71,7 @@ What makes these viable isn't the prompts — it's the **shared infrastructure**
 - **Prompt-injection isolation**: external content is wrapped as "material, not instructions"; outputs scanned for exfiltration patterns.
 - **RBAC + ownership-filtered retrieval**: unauthorized content is filtered *before* it can enter a model context.
 - **Append-only audit**: model, tokens, cost, and I/O digests per call — every conclusion traceable to the exact call that produced it.
+- **Hardened public exposure**: inbound per-IP rate limiting (pure-ASGI middleware, configurable via `AAOS_RATELIMIT_RPM`, default 240/min) shields the always-on control-plane VM from internet scanning and request floods; the backend API port is bound to `127.0.0.1` only — never published to the public internet — so the sole public attack surface is the web tier that proxies `/api`.
 
 ## Architecture
 
@@ -143,7 +144,7 @@ With no API key configured the system runs in **dry-run mode**: the full pipelin
 curl -fsSL https://raw.githubusercontent.com/Vector897/JarvisQwen/main/install.sh | bash
 ```
 
-Open `http://<ECS-IP>:3000`, log in with the generated password in `data/admin_password.txt`, add your key, add a subscription. Done — your first briefing arrives tomorrow morning. All state lives in `./data`; migrating hosts is copy-and-compose-up.
+Open `http://<ECS-IP>:3000` and click **Quick Try** to enter the console (no login — single-user local mode), add your key, add a subscription. Done — your first briefing arrives tomorrow morning. Only expose TCP **22 and 3000** in the security group: the backend (8000) is loopback-only and inbound per-IP rate limiting is on by default. All state lives in `./data`; migrating hosts is copy-and-compose-up.
 
 ## Console
 

@@ -38,7 +38,7 @@ npm install && npm run dev                # http://localhost:3000
 curl -fsSL https://raw.githubusercontent.com/Vector897/JarvisQwen/main/install.sh | bash
 ```
 
-浏览器打开 `http://<ECS IP>:3000` → 用 `data/admin_password.txt` 里的密码登录 → 设置页粘贴 DASHSCOPE_API_KEY → 订阅页添加研究关键词。所有状态在 `./data` 目录,迁移 = 拷贝 + compose up。
+浏览器打开 `http://<ECS IP>:3000` → 点 **Quick Try** 免登录进入控制台(单机单用户模式)→ 设置页粘贴 DASHSCOPE_API_KEY → 订阅页添加研究关键词。安全组只需放行 TCP **22、3000**:后端 8000 仅绑本机回环、不对公网暴露,且默认开启入站 IP 限流(每 IP 240 次/分钟,可用 `AAOS_RATELIMIT_RPM` 调整)。所有状态在 `./data` 目录,迁移 = 拷贝 + compose up。
 
 ## 架构
 

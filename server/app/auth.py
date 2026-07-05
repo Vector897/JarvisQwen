@@ -59,18 +59,28 @@ def parse_session_token(token: str) -> str | None:
         return None
 
 
+def _default_user(db: Session) -> User | None:
+    """单用户本地模式：无需登录，回退到默认本地账户（首启创建的 admin）。"""
+    user = db.execute(select(User).where(User.name == "admin")).scalar_one_or_none()
+    if user:
+        return user
+    return db.execute(select(User)).scalars().first()
+
+
 def current_user(
     db: Session = Depends(get_db),
     aaos_session: str | None = Cookie(default=None),
 ) -> User:
-    if not aaos_session:
-        raise HTTPException(401, "Not signed in")
-    uid = parse_session_token(aaos_session)
-    if not uid:
-        raise HTTPException(401, "Session invalid or expired")
-    user = db.execute(select(User).where(User.id == uid)).scalar_one_or_none()
+    # 有有效会话则用之；否则退回默认本地账户（"快速尝试"免登录直接可用）。
+    if aaos_session:
+        uid = parse_session_token(aaos_session)
+        if uid:
+            user = db.execute(select(User).where(User.id == uid)).scalar_one_or_none()
+            if user:
+                return user
+    user = _default_user(db)
     if not user:
-        raise HTTPException(401, "User not found")
+        raise HTTPException(401, "No local user provisioned")
     return user
 
 

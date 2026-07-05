@@ -25,10 +25,28 @@ export default function Home() {
     <div className="mx-auto max-w-3xl">
       <div className="overflow-hidden rounded-3xl bg-[#05070d] text-slate-200 shadow-2xl ring-1 ring-slate-800">
         {/* Hero */}
-        <div className="flex flex-col items-center px-6 pt-10 text-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-full.png" alt="JarvisQwen — AI Butler System" className="w-72 max-w-full" />
-          <p className="mt-2 text-sm tracking-widest text-sky-400/80">YOUR 24/7 AI BUTLER · POWERED BY QWEN</p>
+        <div className="flex flex-col items-center px-6 pt-12 text-center">
+          <h1 className="text-5xl font-extrabold tracking-tight drop-shadow-[0_0_25px_rgba(56,189,248,0.35)] sm:text-6xl">
+            <span className="text-sky-400">Jarvis</span>
+            <span className="text-white">Qwen</span>
+          </h1>
+          <p className="mt-3 text-sm tracking-widest text-sky-400/80">YOUR 24/7 AI BUTLER · POWERED BY QWEN</p>
+
+          {/* CTA —— 移到 JarvisQwen 下一行 */}
+          <div className="mt-7 flex flex-wrap justify-center gap-3">
+            <Link href="/dashboard"
+              className="rounded-xl bg-sky-500 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-400">
+              Quick Try →
+            </Link>
+            <Link href="/deploy"
+              className="rounded-xl border border-slate-700 px-6 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-sky-500 hover:text-sky-400">
+              🚀 Deploy your own
+            </Link>
+            <a href={REPO} target="_blank" rel="noreferrer"
+              className="rounded-xl border border-slate-700 px-6 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-sky-500 hover:text-sky-400">
+              ⭐ GitHub
+            </a>
+          </div>
         </div>
 
         {/* 隐私声明——放在最前面 */}
@@ -82,22 +100,6 @@ export default function Home() {
           <a href={REPO} target="_blank" rel="noreferrer"
              className="mt-3 inline-block font-mono text-xs text-slate-500 hover:text-sky-400">
             {REPO}
-          </a>
-        </div>
-
-        {/* CTA */}
-        <div className="flex flex-wrap justify-center gap-3 border-t border-slate-800/80 px-8 py-8">
-          <Link href="/dashboard"
-            className="rounded-xl bg-sky-500 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-400">
-            Open the console →
-          </Link>
-          <Link href="/deploy"
-            className="rounded-xl border border-slate-700 px-6 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-sky-500 hover:text-sky-400">
-            🚀 Deploy your own
-          </Link>
-          <a href={REPO} target="_blank" rel="noreferrer"
-            className="rounded-xl border border-slate-700 px-6 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-sky-500 hover:text-sky-400">
-            ⭐ GitHub
           </a>
         </div>
       </div>

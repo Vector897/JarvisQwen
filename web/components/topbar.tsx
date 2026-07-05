@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { api, post } from "@/lib/api";
+import { usePathname } from "next/navigation";
 import { useEvents } from "./events-provider";
 import { useTheme } from "./theme-provider";
 import { useLang } from "@/lib/i18n";
@@ -23,26 +21,14 @@ const DOT: Record<string, [string, string]> = {
 
 export function Topbar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { status } = useEvents();
   const { theme, toggle: toggleTheme } = useTheme();
   const { lang, t, toggle: toggleLang } = useLang();
-  const [user, setUser] = useState<{ name: string; role: string } | null>(null);
-
-  useEffect(() => {
-    if (pathname === "/login" || pathname === "/home") return;
-    api("/api/auth/me").then(setUser).catch(() => {});
-  }, [pathname]);
 
   if (pathname === "/login" || pathname === "/home") return null;
   const titlePair = Object.entries(TITLES).find(([p]) => pathname.startsWith(p))?.[1];
   const title = titlePair ? (lang === "zh" ? titlePair[0] : titlePair[1]) : "JarvisQwen";
   const [dotCls, dotKey] = DOT[status] as [string, "topbar.online" | "topbar.offline"];
-
-  async function logout() {
-    await post("/api/auth/logout", {}).catch(() => {});
-    router.push("/login");
-  }
 
   return (
     <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-2.5 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 md:px-8">
@@ -58,12 +44,6 @@ export function Topbar() {
         <button onClick={toggleLang} className="btn-ghost text-xs" title="切换语言 / Switch language">
           {lang === "zh" ? "EN" : "中"}
         </button>
-        {user && (
-          <span className="hidden text-xs text-slate-500 sm:inline">
-            {user.name}{user.role === "admin" ? ` (${t("topbar.admin")})` : ""}
-          </span>
-        )}
-        <button onClick={logout} className="btn-ghost text-xs">{t("topbar.logout")}</button>
       </div>
     </header>
   );
