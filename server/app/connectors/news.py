@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import html
 import re
+import threading
 import xml.etree.ElementTree as ET
 
 import httpx
@@ -51,11 +52,30 @@ def is_news_query(query: str) -> bool:
     return False
 
 
-def search(query: str, max_results: int = 15) -> list[dict]:
+def _bounded(fn, timeout: float, default):
+    """在守护线程里跑 fn，最多等 timeout 秒。超时/异常都返回 default，
+    绝不阻塞调用方（守护线程随进程退出，不会挂起 worker）。DNS 解析卡死
+    不受 httpx 超时管辖，这层兜底是必要的。"""
+    box = [default]
+
+    def run() -> None:
+        try:
+            box[0] = fn()
+        except Exception:  # noqa: BLE001  网络/解析失败 → 保持 default
+            pass
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    t.join(timeout)
+    return box[0]
+
+
+def _fetch(query: str, max_results: int) -> list[dict]:
     hl, gl, ceid = _locale(query)
     resp = httpx.get(
         RSS, params={"q": query, "hl": hl, "gl": gl, "ceid": ceid},
-        timeout=30, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0"},
+        timeout=httpx.Timeout(12.0, connect=5.0), follow_redirects=True,
+        headers={"User-Agent": "Mozilla/5.0"},
     )
     resp.raise_for_status()
     root = ET.fromstring(resp.text)
@@ -81,3 +101,8 @@ def search(query: str, max_results: int = 15) -> list[dict]:
             "kind": "news",
         })
     return out
+
+
+def search(query: str, max_results: int = 15) -> list[dict]:
+    """检索新闻，最多耗时 15 秒；不可达/超时/解析失败均返回空列表，绝不阻塞管道。"""
+    return _bounded(lambda: _fetch(query, max_results), timeout=15.0, default=[])

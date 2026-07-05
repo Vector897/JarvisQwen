@@ -33,13 +33,13 @@ TEMPLATES = [
     {
         "id": "market_watch",
         "name": "Market & finance watch",
-        "description": "Follow quantitative finance and economics preprints — portfolio "
-                       "methods, risk models, forecasting — briefed every morning",
+        "description": "Track markets both ways — breaking financial news (stocks, earnings, "
+                       "M&A) and quantitative finance preprints — triaged and briefed every morning",
         "task_type": "arxiv_watch",
         "fields": [
-            {"key": "query", "label": "Market topic", "type": "text",
-             "placeholder": "e.g. portfolio optimization / volatility forecasting"},
-            {"key": "max_results", "label": "Papers per poll", "type": "number", "default": 15},
+            {"key": "query", "label": "Market topic or ticker", "type": "text",
+             "placeholder": "e.g. Micron MU stock / portfolio optimization"},
+            {"key": "max_results", "label": "Items per poll", "type": "number", "default": 15},
         ],
     },
     {

@@ -19,6 +19,9 @@ from ...settings_store import get_setting
 from ..engine import StepDef, TaskContext, register
 
 
+MAX_DEEP = 6  # 单次任务最多深度总结的条目数（控成本与时长）
+
+
 def fingerprint(title: str, arxiv_id: str) -> str:
     return hashlib.sha256(f"{arxiv_id}|{title.lower().strip()}".encode()).hexdigest()[:32]
 
@@ -83,7 +86,10 @@ def step_filter(ctx: TaskContext, state: dict) -> dict:
             scores[int(item["i"])] = float(item["score"])
     except Exception:  # noqa: BLE001  解析失败（或 dry-run）→ 全部通过，宁多勿漏
         scores = {i: 1.0 for i in range(len(fresh))}
-    selected = [p for i, p in enumerate(fresh) if scores.get(i, 0) >= threshold]
+    # 过阈值后按分数降序，最多深度总结 MAX_DEEP 篇（控成本/时长：新闻常全部命中）
+    passing = sorted((i for i in range(len(fresh)) if scores.get(i, 0) >= threshold),
+                     key=lambda i: scores.get(i, 0), reverse=True)
+    selected = [fresh[i] for i in passing[:MAX_DEEP]]
     state["selected"] = selected
     ctx.artifact("Triage scores", "\n".join(
         f"- [{scores.get(i, 0):.2f}] {p['title']}" for i, p in enumerate(fresh)) or "(none)")
