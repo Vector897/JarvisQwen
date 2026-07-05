@@ -11,6 +11,9 @@ services:
     environment:
       - AAOS_DATA_DIR=/srv/data
       - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}  # 根目录 .env 中配置，启动时自动入库
+      - AAOS_ACCESS_CODE=${AAOS_ACCESS_CODE:-}    # 设置后 /api 需带访问码（公网演示防烧额度）
+      - AAOS_RATELIMIT_RPM=${AAOS_RATELIMIT_RPM:-240}
+      - AAOS_RATELIMIT_ENABLED=${AAOS_RATELIMIT_ENABLED:-true}
     ports:
       # 仅绑本机回环：web 容器经 docker 内网 http://server:8000 访问，无需公网暴露。
       # 后端 API 不直接对外，攻击面只剩 3000（web 反代 /api）。SSH 内 curl localhost:8000 仍可用于取证。

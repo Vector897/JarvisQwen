@@ -16,6 +16,7 @@ export function middleware(req: NextRequest) {
   return res;
 }
 
+// 只作用于页面导航（排除 /api、_next、静态文件）——魔法链接的 ?k= 只出现在页面 URL。
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.).*)"],
 };
