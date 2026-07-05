@@ -64,19 +64,19 @@ def current_user(
     aaos_session: str | None = Cookie(default=None),
 ) -> User:
     if not aaos_session:
-        raise HTTPException(401, "未登录")
+        raise HTTPException(401, "Not signed in")
     uid = parse_session_token(aaos_session)
     if not uid:
-        raise HTTPException(401, "会话无效或已过期")
+        raise HTTPException(401, "Session invalid or expired")
     user = db.execute(select(User).where(User.id == uid)).scalar_one_or_none()
     if not user:
-        raise HTTPException(401, "用户不存在")
+        raise HTTPException(401, "User not found")
     return user
 
 
 def require_admin(user: User = Depends(current_user)) -> User:
     if user.role != "admin":
-        raise HTTPException(403, "需要管理员权限")
+        raise HTTPException(403, "Admin privileges required")
     return user
 
 
@@ -92,4 +92,4 @@ def ensure_admin_user() -> None:
         db.add(User(name="admin", role="admin", password_hash=hash_password(password)))
         pw_file = config.data_dir / "admin_password.txt"
         pw_file.write_text(password)
-        print(f"[AAOS] 已创建管理员账号 admin，初始密码见 {pw_file}（登录后请修改）")
+        print(f"[JarvisQwen] Admin account created; initial password in {pw_file} (change it after signing in)")

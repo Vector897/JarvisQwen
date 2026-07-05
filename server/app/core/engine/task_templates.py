@@ -1,33 +1,40 @@
-"""任务模板：常见科研场景填空即用，降低自然语言下任务的门槛。"""
+"""任务模板：常见监控场景填空即用，降低自然语言下任务的门槛。
+
+模板话术面向"知识工作监控"这一通用模式；当前连接器为 arXiv/Semantic Scholar
+（覆盖 CS/物理/数学/金融/生物/工程等学科），其他信息源按同一图结构扩展。
+"""
 from __future__ import annotations
 
 TEMPLATES = [
     {
         "id": "literature_watch",
-        "name": "文献跟踪",
-        "description": "持续监控某个研究方向的新论文，自动总结归档",
+        "name": "Topic watch",
+        "description": "Continuously monitor new publications on any topic — AI, finance, "
+                       "biology, engineering — auto-triage, deep-summarize, archive, brief",
         "task_type": "arxiv_watch",
         "fields": [
-            {"key": "query", "label": "研究方向关键词", "type": "text",
-             "placeholder": "如：counterfactual regret minimization"},
-            {"key": "max_results", "label": "单次检索篇数", "type": "number", "default": 15},
+            {"key": "query", "label": "Topic keywords", "type": "text",
+             "placeholder": "e.g. LLM agent security / portfolio optimization"},
+            {"key": "max_results", "label": "Papers per poll", "type": "number", "default": 15},
         ],
     },
     {
         "id": "proposal_research",
-        "name": "开题调研",
-        "description": "针对一个具体课题做一轮集中检索与总结，适合开题前快速摸底",
+        "name": "Deep-dive survey",
+        "description": "One focused sweep over a specific question — search wide, triage, "
+                       "summarize everything relevant. Great before starting a project",
         "task_type": "arxiv_watch",
         "fields": [
-            {"key": "query", "label": "课题描述", "type": "text",
-             "placeholder": "如：多智能体强化学习中的灾难性遗忘"},
-            {"key": "max_results", "label": "检索篇数（建议调大）", "type": "number", "default": 30},
+            {"key": "query", "label": "Research question", "type": "text",
+             "placeholder": "e.g. catastrophic forgetting in multi-agent RL"},
+            {"key": "max_results", "label": "Papers to sweep (go big)", "type": "number", "default": 30},
         ],
     },
     {
         "id": "weekly_briefing",
-        "name": "立即生成简报",
-        "description": "不等到明天早晨，立刻汇总近 24 小时的总结生成一份简报",
+        "name": "Briefing now",
+        "description": "Don't wait for tomorrow morning — aggregate the last 24h of "
+                       "summaries into a briefing right now",
         "task_type": "briefing",
         "fields": [],
     },
@@ -37,9 +44,9 @@ TEMPLATES = [
 def apply_template(template_id: str, values: dict) -> tuple[str, dict, str]:
     tpl = next((t for t in TEMPLATES if t["id"] == template_id), None)
     if tpl is None:
-        raise ValueError(f"未知模板：{template_id}")
+        raise ValueError(f"Unknown template: {template_id}")
     params = {}
     for f in tpl["fields"]:
         params[f["key"]] = values.get(f["key"], f.get("default", ""))
-    title = f"{tpl['name']}：{params.get('query', '')}"[:60]
+    title = f"{tpl['name']}: {params.get('query', '')}".strip(": ")[:60]
     return tpl["task_type"], params, title

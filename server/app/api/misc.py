@@ -106,10 +106,10 @@ def approvals(user: User = Depends(current_user), db: Session = Depends(get_db))
 def decide(approval_id: str, decision: str,
            user: User = Depends(current_user), db: Session = Depends(get_db)):
     if decision not in ("approve", "reject"):
-        raise HTTPException(400, "decision 必须是 approve/reject")
+        raise HTTPException(400, "decision must be approve/reject")
     a = db.execute(select(Approval).where(Approval.id == approval_id)).scalar_one_or_none()
     if not a or a.status != "pending":
-        raise HTTPException(404, "审批项不存在或已处理")
+        raise HTTPException(404, "Approval item not found or already handled")
     a.status = "approved" if decision == "approve" else "rejected"
     a.decided_by = user.id
     task = db.execute(select(Task).where(Task.id == a.task_id)).scalar_one_or_none()
@@ -148,7 +148,7 @@ def write_settings(body: SettingsIn, user: User = Depends(require_admin),
                    db: Session = Depends(get_db)):
     unknown = [k for k in body.values if k not in DEFAULTS]
     if unknown:
-        raise HTTPException(400, f"未知配置项：{unknown}")
+        raise HTTPException(400, f"Unknown settings: {unknown}")
     for k, v in body.values.items():
         if k in SECRET_KEYS and not str(v).strip():
             continue  # 密钥字段留空 = 不修改既有值
@@ -158,9 +158,9 @@ def write_settings(body: SettingsIn, user: User = Depends(require_admin),
 
 @router.post("/settings/test-notify")
 def test_notify(user: User = Depends(require_admin), db: Session = Depends(get_db)):
-    results = notify_all(db, "AAOS 测试推送", "如果你看到这条消息，说明推送配置正确 ✅")
+    results = notify_all(db, "JarvisQwen test push", "If you can read this, push notifications are configured correctly ✅")
     if not results:
-        raise HTTPException(400, "未启用任何推送渠道")
+        raise HTTPException(400, "No push channel enabled")
     return {"results": results}
 
 
@@ -170,18 +170,18 @@ def export_briefing(briefing_id: str, fmt: str = "md",
                     user: User = Depends(current_user), db: Session = Depends(get_db)):
     b = db.execute(select(Briefing).where(Briefing.id == briefing_id)).scalar_one_or_none()
     if not b:
-        raise HTTPException(404, "简报不存在")
+        raise HTTPException(404, "Briefing not found")
     if fmt == "md":
         return Response(b.content_md, media_type="text/markdown",
                         headers={"Content-Disposition": f'attachment; filename="briefing_{b.date}.md"'})
     if fmt == "pdf":
         try:
-            pdf = markdown_to_pdf_bytes(f"AAOS 简报 {b.date}", b.content_md)
+            pdf = markdown_to_pdf_bytes(f"JarvisQwen briefing {b.date}", b.content_md)
         except ImportError:
-            raise HTTPException(501, "服务器未安装 PDF 导出依赖（pip install reportlab）")
+            raise HTTPException(501, "PDF export dependency missing on server (pip install reportlab)")
         return Response(pdf, media_type="application/pdf",
                         headers={"Content-Disposition": f'attachment; filename="briefing_{b.date}.pdf"'})
-    raise HTTPException(400, "fmt 必须是 md 或 pdf")
+    raise HTTPException(400, "fmt must be md or pdf")
 
 
 @router.get("/library/export")
@@ -195,7 +195,7 @@ def export_library(fmt: str = "bibtex", user: User = Depends(current_user), db: 
                            "published_at": p.published_at, "url": p.url} for p in papers])
         return Response(text, media_type="application/x-bibtex",
                         headers={"Content-Disposition": 'attachment; filename="aaos_library.bib"'})
-    raise HTTPException(400, "目前仅支持 fmt=bibtex")
+    raise HTTPException(400, "Only fmt=bibtex is supported for now")
 
 
 # ---------- Zotero 同步 ----------
@@ -203,7 +203,7 @@ def export_library(fmt: str = "bibtex", user: User = Depends(current_user), db: 
 def zotero_sync_one(paper_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
     p = db.execute(select(Paper).where(Paper.id == paper_id)).scalar_one_or_none()
     if not p:
-        raise HTTPException(404, "论文不存在")
+        raise HTTPException(404, "Paper not found")
     item = paper_to_zotero_item(p.title, p.authors, p.abstract, p.url, p.published_at, p.arxiv_id)
     ok, msg = push_papers(db, [item])
     if not ok:
@@ -219,13 +219,13 @@ class QaIn(BaseModel):
 @router.post("/library/qa")
 def library_qa(body: QaIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     if not body.question.strip():
-        raise HTTPException(400, "问题不能为空")
+        raise HTTPException(400, "Question cannot be empty")
     stmt = select(Paper).order_by(Paper.created_at.desc()).limit(200)
     if user.role != "admin":
         stmt = stmt.where(Paper.owner_id == user.id)  # AFR：先过滤再检索
     papers = db.execute(stmt).scalars().all()
     if not papers:
-        return {"answer": "知识库为空，还没有可供检索的论文。", "cited": [], "escalated": False}
+        return {"answer": "The library is empty — no papers to search yet.", "cited": [], "escalated": False}
 
     terms = [t for t in body.question.lower().split() if len(t) > 1]
     scored = []
@@ -239,16 +239,17 @@ def library_qa(body: QaIn, user: User = Depends(current_user), db: Session = Dep
     scored.sort(key=lambda x: -x[0])
     top = scored[:6]
     if not top:
-        return {"answer": "知识库中没有找到相关论文，试试换个关键词，或先跑一次文献跟踪任务。",
+        return {"answer": "No relevant papers found in the library. Try different keywords, or run a topic watch first.",
                 "cited": [], "escalated": False}
 
     evidence = "\n\n".join(
-        f"[{i+1}] 《{p.title}》：{(s.content_md if s else p.abstract)[:600]}"
+        f"[{i+1}] \"{p.title}\": {(s.content_md if s else p.abstract)[:600]}"
         for i, (_, p, s) in enumerate(top)
     )
     prompt = (
-        f"根据以下我知识库中的论文证据回答问题。回答时用 [编号] 标注引用来源，不要编造未提及的内容。\n\n"
-        f"问题：{body.question}\n\n证据：\n{evidence}"
+        f"Answer the question using ONLY the paper evidence from my library below. "
+        f"Cite sources as [number]; do not invent anything not present in the evidence.\n\n"
+        f"Question: {body.question}\n\nEvidence:\n{evidence}"
     )
     result, escalated = cascade.complete_cascade(db, prompt, step="library_qa", max_tokens=1200)
     return {"answer": result.text, "escalated": escalated,

@@ -8,14 +8,14 @@ from ..engine import StepDef, TaskContext, register
 
 def step_one(ctx: TaskContext, state: dict) -> dict:
     time.sleep(1)
-    state["msg"] = state["params"].get("message", "hello AAOS")
-    ctx.artifact("回显输入", state["msg"])
+    state["msg"] = state["params"].get("message", "hello JarvisQwen")
+    ctx.artifact("Echo input", state["msg"])
     return state
 
 
 def step_two(ctx: TaskContext, state: dict) -> dict:
     time.sleep(1)
-    ctx.artifact("回显输出", f"echo: {state['msg']}")
+    ctx.artifact("Echo output", f"echo: {state['msg']}")
     return state
 
 

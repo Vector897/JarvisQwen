@@ -41,9 +41,9 @@ def check(db: Session, task: Task | None = None, upcoming_estimate: float = 0.01
         if get_setting(db, "notify_on_budget_cutoff") and _last_cutoff_notified_date != today:
             _last_cutoff_notified_date = today
             from ...connectors.notify import notify_all
-            notify_all(db, "AAOS 预算熔断", f"今日花费已达 ${spent:.2f}/${daily_limit:.2f}，任务已挂起等待明日或调高预算。")
-        raise BudgetExceeded(f"日预算已用尽（${spent:.2f}/${daily_limit:.2f}）")
+            notify_all(db, "JarvisQwen budget cutoff", f"Today's spend reached ${spent:.2f}/${daily_limit:.2f}. Tasks suspended until tomorrow or a higher cap.")
+        raise BudgetExceeded(f"Daily budget exhausted (${spent:.2f}/${daily_limit:.2f})")
     if spent >= 0.8 * daily_limit:
         bus.publish("budget_alert", {"level": "warn", "spent": spent, "limit": daily_limit})
     if task is not None and task.budget_limit_usd > 0 and task.cost_usd >= task.budget_limit_usd:
-        raise BudgetExceeded(f"任务预算已用尽（${task.cost_usd:.2f}/${task.budget_limit_usd:.2f}）")
+        raise BudgetExceeded(f"Task budget exhausted (${task.cost_usd:.2f}/${task.budget_limit_usd:.2f})")

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { api, post, fmtEta, STATUS_LABEL } from "@/lib/api";
+import { api, post, fmtEta, statusLabel } from "@/lib/api";
 import { useEvents } from "@/components/events-provider";
 import { useToast } from "@/components/toast";
 import { EmptyState, Skeleton } from "@/components/ui";
@@ -10,13 +10,15 @@ import { useLang } from "@/lib/i18n";
 
 const EXAMPLES = {
   zh: [
-    "帮我调研 catastrophic forgetting in counterfactual regret minimization 的最新进展",
-    "跟踪 multi-agent debate 方向的新论文",
+    "跟踪 LLM agent security 方向的新论文",
+    "调研 reinforcement learning for portfolio optimization 的最新进展",
+    "跟踪 diffusion models for protein design",
     "生成今日简报",
   ],
   en: [
-    "Research the latest progress on catastrophic forgetting in CFR",
-    "Track new papers on multi-agent debate",
+    "Track new papers on LLM agent security",
+    "Research the latest progress on RL for portfolio optimization",
+    "Watch diffusion models for protein design",
     "Generate today's briefing",
   ],
 };
@@ -54,7 +56,7 @@ export default function Tasks() {
     setBusy(true);
     try {
       const r = await post("/api/tasks", { prompt });
-      toast(`${t("tasks.created")}「${r.title}」`, "success");
+      toast(`${t("tasks.created")}: ${r.title}`, "success");
       setPrompt("");
       load();
     } catch (err: any) {
@@ -76,7 +78,7 @@ export default function Tasks() {
     setBusy(true);
     try {
       const r = await post("/api/tasks", { template_id: activeTpl.id, template_values: tplValues });
-      toast(`${t("tasks.created")}「${r.title}」`, "success");
+      toast(`${t("tasks.created")}: ${r.title}`, "success");
       setActiveTpl(null);
       load();
     } catch (err: any) {
@@ -139,7 +141,7 @@ export default function Tasks() {
       ) : (
         <div className="space-y-2">
           {tasks.map((tk) => {
-            const [label, cls] = STATUS_LABEL[tk.status] || [tk.status, "bg-slate-100"];
+            const [label, cls] = statusLabel(tk.status, lang);
             return (
               <Link key={tk.id} href={`/tasks/${tk.id}`} className="card-link">
                 <div className="flex items-center justify-between gap-2">
@@ -147,7 +149,7 @@ export default function Tasks() {
                     <div className="truncate font-medium">{tk.title || tk.type}</div>
                     <div className="text-xs text-slate-400">
                       {tk.type} · ${tk.cost_usd}
-                      {tk.status === "RUNNING" && tk.eta_ts ? ` · ${fmtEta(tk.eta_ts)}` : ""}
+                      {tk.status === "RUNNING" && tk.eta_ts ? ` · ${fmtEta(tk.eta_ts, lang)}` : ""}
                     </div>
                   </div>
                   <span className={`badge shrink-0 ${cls}`}>{label}</span>

@@ -52,7 +52,7 @@ def worker_loop() -> None:
                 task = db.execute(select(Task).where(Task.id == task_id)).scalar_one_or_none()
                 if task and task.status == "RUNNING":
                     task.status = "FAILED"
-                    task.error = "调度器异常，任务可从检查点重跑"
+                    task.error = "Scheduler error - task can be rerun from checkpoint"
 
 
 def watchdog() -> None:
@@ -63,7 +63,7 @@ def watchdog() -> None:
         ).scalars().all()
         for t in rows:
             t.status = "QUEUED"  # 检查点仍在，重跑不重复付费
-            t.error = "看门狗回收：执行超时（僵尸任务），已从检查点重新排队"
+            t.error = "Watchdog reclaim: execution timed out (zombie); re-queued from checkpoint"
             bus.publish("task_zombie_requeued", {"task_id": t.id})
 
 
@@ -77,7 +77,7 @@ def check_subscriptions() -> None:
                 continue
             sub.last_run_at = now
             db.add(Task(
-                type="arxiv_watch", title=f"订阅轮询：{sub.query}",
+                type="arxiv_watch", title=f"Subscription poll: {sub.query}",
                 params_json=json.dumps({"query": sub.query, "max_results": 15}, ensure_ascii=False),
                 owner_id=sub.owner_id, priority=7,
             ))
@@ -100,7 +100,7 @@ def nightly_consolidate() -> None:
 def daily_briefing() -> None:
     with session() as db:
         for user in db.execute(select(User).where(User.role != "viewer")).scalars().all():
-            db.add(Task(type="briefing", title="晨间简报", owner_id=user.id, priority=3,
+            db.add(Task(type="briefing", title="Morning briefing", owner_id=user.id, priority=3,
                         params_json="{}"))
 
 

@@ -40,7 +40,7 @@ def _call_litellm(db: Session, model: str, prompt: str, max_tokens: int) -> tupl
     provider = providers.provider_of_model(model)
     key_row = providers.pick_key(db, provider)
     if key_row is None:
-        raise resilience.AllModelsFailed(f"厂商 {provider} 没有可用的 API Key")
+        raise resilience.AllModelsFailed(f"No usable API key for provider {provider}")
     kwargs: dict = {
         "api_key": providers.decrypt_key(key_row.encrypted_key),
         "max_tokens": max_tokens,
@@ -101,7 +101,7 @@ def complete(
 
     # dry-run：没有任何 Key 时返回模拟响应，流程照走
     if not _has_any_key(db):
-        fake = f"[模拟响应/dry-run] tier={tier}，未配置 API Key。请求摘要：{safe_prompt[:120]}"
+        fake = f"[simulated/dry-run] tier={tier}, no API key configured. Prompt digest: {safe_prompt[:120]}"
         audit_log.record(db, task_id=task_id, step=step, model="(simulated)", input_text=safe_prompt,
                          output_text=fake, simulated=True)
         return LlmResult(text=fake, model="(simulated)", cost_usd=0, simulated=True)

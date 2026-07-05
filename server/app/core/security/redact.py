@@ -86,7 +86,7 @@ def redact(text: str, level: str = "medium") -> RedactionResult:
             text = text.replace(token, ph)
 
     if level == "high" and high_risk_hit:
-        return RedactionResult(text="", mapping={}, blocked=True, reason="检测到高危敏感数据，已按验证模式阻断出境")
+        return RedactionResult(text="", mapping={}, blocked=True, reason="High-risk sensitive data detected; egress blocked (strict mode)")
 
     # Tier 3: Presidio NER（可选依赖，装了才启用）
     try:

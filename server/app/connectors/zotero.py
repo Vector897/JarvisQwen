@@ -51,7 +51,7 @@ def paper_to_zotero_item(title: str, authors: str, abstract: str, url: str,
 def push_papers(db: Session, items: list[dict]) -> tuple[bool, str]:
     conf = _base_url(db)
     if conf is None:
-        return False, "未配置 Zotero API Key / Library ID（设置页 → Zotero 同步）"
+        return False, "Zotero API key / library ID not configured (Settings -> Zotero sync)"
     url, headers = conf
     try:
         resp = httpx.post(url, headers=headers, json=items, timeout=30)
@@ -59,7 +59,7 @@ def push_papers(db: Session, items: list[dict]) -> tuple[bool, str]:
             body = resp.json()
             ok_count = len(body.get("success", {}))
             fail_count = len(body.get("failed", {}))
-            return ok_count > 0, f"成功 {ok_count} 篇，失败 {fail_count} 篇"
-        return False, f"Zotero API 错误 {resp.status_code}：{resp.text[:200]}"
+            return ok_count > 0, f"{ok_count} succeeded, {fail_count} failed"
+        return False, f"Zotero API error {resp.status_code}: {resp.text[:200]}"
     except Exception as e:  # noqa: BLE001
-        return False, f"Zotero 推送异常：{e}"
+        return False, f"Zotero push error: {e}"

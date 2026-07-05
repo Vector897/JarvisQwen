@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
     providers.import_env_keys()  # .env 里有 DASHSCOPE_API_KEY 时自动入库
     runner.start(_scheduler)  # 工作线程 + 定时作业 + 崩溃任务恢复
     _scheduler.start()
-    print(f"[AAOS] v{__version__} 控制平面已启动  http://{config.host}:{config.port}")
+    print(f"[JarvisQwen] v{__version__} control plane up at http://{config.host}:{config.port}")
     yield
     runner.stop()
     _scheduler.shutdown(wait=False)

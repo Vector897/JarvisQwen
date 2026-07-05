@@ -95,16 +95,16 @@ def probe(provider: str, key: str, base_url: str = "") -> tuple[bool, str]:
             kwargs["api_base"] = base_url
             model = "openai/" + model.split("/", 1)[-1]
         litellm.completion(model=model, messages=[{"role": "user", "content": "ping"}], **kwargs)
-        return True, "Key 可用 ✅"
+        return True, "Key valid ✅"
     except Exception as e:  # noqa: BLE001
         msg = str(e)
         if "401" in msg or "invalid" in msg.lower() or "authentication" in msg.lower():
-            return False, "Key 无效（认证失败），请检查是否复制完整"
+            return False, "Invalid key (authentication failed) - check that it was copied in full"
         if "quota" in msg.lower() or "insufficient" in msg.lower() or "balance" in msg.lower():
-            return False, "Key 有效但余额/配额不足"
+            return False, "Key valid but out of quota/balance"
         if "429" in msg:
-            return True, "Key 可用，但当前处于限流状态"
-        return False, f"校验失败：{msg[:160]}"
+            return True, "Key valid, currently rate-limited"
+        return False, f"Validation failed: {msg[:160]}"
 
 
 def import_env_keys() -> None:
@@ -142,7 +142,7 @@ def import_env_keys() -> None:
             return
         db.add(ApiKey(provider="qwen", encrypted_key=encrypt_key(key),
                       label="env:DASHSCOPE_API_KEY", owner_id=admin.id))
-        print(f"[JarvisQwen] 已从环境变量导入 Qwen Cloud API Key（{mask(key)}）")
+        print(f"[JarvisQwen] Imported Qwen Cloud API key from environment ({mask(key)})")
 
 
 def pick_key(db: Session, provider: str) -> ApiKey | None:

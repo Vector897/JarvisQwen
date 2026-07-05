@@ -157,7 +157,7 @@ function GeneralSection() {
         <label className="block">
           <span className="mb-1 block font-medium">{t("settings.researchProfile")}</span>
           <textarea className="input" rows={2} value={s.research_profile} onChange={set("research_profile")}
-            placeholder="e.g. Catastrophic forgetting in discrete CFR / multi-agent debate" />
+            placeholder="e.g. LLM agent security / RL for portfolio optimization / protein design" />
         </label>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block">

@@ -27,7 +27,7 @@ def step_fetch(ctx: TaskContext, state: dict) -> dict:
     params = state["params"]
     found = arxiv.search(params.get("query", "LLM agents"), int(params.get("max_results", 15)))
     state["found"] = found
-    ctx.artifact("检索结果", "\n".join(f"- {p['title']} ({p['published_at']})" for p in found) or "(无结果)")
+    ctx.artifact("Search results", "\n".join(f"- {p['title']} ({p['published_at']})" for p in found) or "(no results)")
     return state
 
 
@@ -40,7 +40,7 @@ def step_dedupe(ctx: TaskContext, state: dict) -> dict:
             p["fingerprint"] = fp
             fresh.append(p)
     state["fresh"] = fresh
-    ctx.artifact("去重结果", f"新论文 {len(fresh)} / 检索 {len(state['found'])} 篇")
+    ctx.artifact("Dedupe result", f"{len(fresh)} new / {len(state['found'])} fetched")
     return state
 
 
@@ -53,8 +53,8 @@ def step_filter(ctx: TaskContext, state: dict) -> dict:
     profile = str(get_setting(ctx.db, "research_profile")) or state["params"].get("query", "")
     listing = "\n".join(f"{i}. {p['title']} — {p['abstract'][:300]}" for i, p in enumerate(fresh))
     prompt = (
-        f"我的研究方向：{profile}\n\n以下是候选论文，请为每篇打相关度分（0-1），"
-        f'只输出 JSON 数组，如 [{{"i":0,"score":0.8}}]：\n\n{wrap_external(listing)}'
+        f"My research focus: {profile}\n\nBelow are candidate papers. Score each for relevance (0-1). "
+        f'Output ONLY a JSON array like [{{"i":0,"score":0.8}}]:\n\n{wrap_external(listing)}'
     )
     result = llm.complete(ctx.db, prompt, tier=policy.TIER_LIGHT, task=ctx.task, step="filter", max_tokens=1024)
     threshold = float(get_setting(ctx.db, "relevance_threshold"))
@@ -68,8 +68,8 @@ def step_filter(ctx: TaskContext, state: dict) -> dict:
         scores = {i: 1.0 for i in range(len(fresh))}
     selected = [p for i, p in enumerate(fresh) if scores.get(i, 0) >= threshold]
     state["selected"] = selected
-    ctx.artifact("初筛结果", "\n".join(
-        f"- [{scores.get(i, 0):.2f}] {p['title']}" for i, p in enumerate(fresh)) or "(无)")
+    ctx.artifact("Triage scores", "\n".join(
+        f"- [{scores.get(i, 0):.2f}] {p['title']}" for i, p in enumerate(fresh)) or "(none)")
     return state
 
 
@@ -87,7 +87,7 @@ def step_ingest(ctx: TaskContext, state: dict) -> dict:
         ctx.db.flush()
         stored_ids.append(paper.id)
     state["paper_ids"] = stored_ids
-    ctx.artifact("归档清单", f"已归档 {len(stored_ids)} 篇（PDF + 元数据）")
+    ctx.artifact("Archive manifest", f"Archived {len(stored_ids)} papers (PDF + metadata)")
     return state
 
 
@@ -102,9 +102,10 @@ def step_summarize(ctx: TaskContext, state: dict) -> dict:
         fulltext = pdf_ingest.extract_text(paper.pdf_path, max_chars=40000)
         body = fulltext if fulltext else paper.abstract
         prompt = (
-            "请总结这篇论文：核心贡献、方法、实验结论、与已有工作的差异，"
-            "以及对科研人员的启示。用中文、Markdown 格式、400 字以内。\n\n"
-            f"标题：{paper.title}\n\n{wrap_external(body)}"
+            "Summarize this paper: core contribution, method, experimental findings, "
+            "how it differs from prior work, and takeaways for researchers. "
+            "Markdown, under 300 words.\n\n"
+            f"Title: {paper.title}\n\n{wrap_external(body)}"
         )
         result = llm.complete(ctx.db, prompt, tier=policy.TIER_FRONTIER, task=ctx.task,
                               step="summarize", max_tokens=1500)
@@ -112,8 +113,8 @@ def step_summarize(ctx: TaskContext, state: dict) -> dict:
                            cost_usd=result.cost_usd))
         done.append(pid)
         bus.publish("task_progress", {"task_id": ctx.task.id,
-                                      "sub_progress": f"总结 {idx + 1}/{len(ids)}"})
-    ctx.artifact("总结完成", f"共总结 {len(done)} 篇")
+                                      "sub_progress": f"Summarizing {idx + 1}/{len(ids)}"})
+    ctx.artifact("Summaries done", f"Summarized {len(done)} papers")
     return state
 
 
@@ -121,8 +122,8 @@ def step_memorize(ctx: TaskContext, state: dict) -> dict:
     n = len(state.get("summarized", []))
     q = state["params"].get("query", "")
     memory.write_episodic(ctx.db, ctx.task.owner_id,
-                          f"执行文献跟踪「{q}」：检索 {len(state.get('found', []))} 篇，"
-                          f"新增 {len(state.get('fresh', []))} 篇，总结 {n} 篇。",
+                          f"Ran literature watch '{q}': fetched {len(state.get('found', []))}, "
+                          f"{len(state.get('fresh', []))} new, summarized {n}.",
                           tags=f"arxiv_watch,{q}")
     return state
 

@@ -103,4 +103,4 @@ def call_with_fallbacks(
                     time.sleep(delays[attempt])
                 else:
                     break  # 不可重试或次数用尽 → 换下一个模型
-    raise AllModelsFailed(f"全部模型失败，最后错误：{last_error}")
+    raise AllModelsFailed(f"All models failed; last error: {last_error}")

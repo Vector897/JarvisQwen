@@ -27,7 +27,7 @@ class ChangePasswordIn(BaseModel):
 def login(body: LoginIn, response: Response, db: Session = Depends(get_db)):
     user = db.execute(select(User).where(User.name == body.username)).scalar_one_or_none()
     if not user or not verify_password(body.password, user.password_hash):
-        raise HTTPException(401, "用户名或密码错误")
+        raise HTTPException(401, "Invalid username or password")
     response.set_cookie(SESSION_COOKIE, make_session_token(user.id),
                         httponly=True, samesite="lax", max_age=7 * 86400)
     return {"id": user.id, "name": user.name, "role": user.role}
@@ -49,8 +49,8 @@ def change_password(body: ChangePasswordIn, user: User = Depends(current_user),
                     db: Session = Depends(get_db)):
     row = db.execute(select(User).where(User.id == user.id)).scalar_one()
     if not verify_password(body.old_password, row.password_hash):
-        raise HTTPException(400, "原密码错误")
+        raise HTTPException(400, "Current password is incorrect")
     if len(body.new_password) < 8:
-        raise HTTPException(400, "新密码至少 8 位")
+        raise HTTPException(400, "New password must be at least 8 characters")
     row.password_hash = hash_password(body.new_password)
     return {"ok": True}

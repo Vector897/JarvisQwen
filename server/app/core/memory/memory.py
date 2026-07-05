@@ -62,12 +62,13 @@ def _find_conflict(db: Session, owner_id: str, new_fact: str) -> Memory | None:
 def _arbitrate(db: Session, old: Memory, new_fact: str) -> str:
     """时序仲裁：生成保留历史连续性的调和摘要，而非硬覆盖。"""
     prompt = (
-        "以下是同一话题在不同时间点的两条记录，可能存在更新或矛盾。"
-        "请用一句话生成带时间感的调和摘要（如「X 在 T1 前是 A，此后更新为 B」）："
-        f"\n旧记录：{old.content}\n新记录：{new_fact}"
+        "Below are two records on the same topic from different points in time; they may conflict. "
+        "Write ONE sentence that reconciles them with explicit time sense "
+        "(e.g. 'X was A before T1, updated to B since'):"
+        f"\nOld record: {old.content}\nNew record: {new_fact}"
     )
     result = llm.complete(db, prompt, tier=policy.TIER_LIGHT, step="memory_arbitrate", max_tokens=200)
-    return result.text.strip() or f"{old.content}（已更新：{new_fact}）"
+    return result.text.strip() or f"{old.content} (updated: {new_fact})"
 
 
 def consolidate(db: Session, owner_id: str) -> int:
@@ -83,9 +84,9 @@ def consolidate(db: Session, owner_id: str) -> int:
         return 0
     joined = "\n---\n".join(e.content[:500] for e in episodes[:40])
     prompt = (
-        "以下是一个科研助理系统过去 24 小时的工作记录片段。"
-        "请提炼出 1-5 条值得长期记住的事实或模式（如用户关注的方向、反复出现的主题、明确的偏好），"
-        "每条一行，直接输出结论，不要编号以外的多余文字：\n\n" + joined
+        "Below are work-log fragments from a research-assistant system over the past 24 hours. "
+        "Extract 1-5 facts or patterns worth remembering long-term (topics the user cares "
+        "about, recurring themes, explicit preferences). One per line, conclusions only:\n\n" + joined
     )
     result = llm.complete(db, prompt, tier=policy.TIER_LIGHT, step="memory_consolidate", max_tokens=512)
     count = 0

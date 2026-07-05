@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ReactFlow, Background, type Node, type Edge } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { api, post, fmtEta, fmtTime, STATUS_LABEL } from "@/lib/api";
+import { api, post, fmtEta, fmtTime, statusLabel } from "@/lib/api";
 import { useEvents } from "@/components/events-provider";
 import { useToast } from "@/components/toast";
 import { Skeleton } from "@/components/ui";
@@ -25,7 +25,7 @@ export default function TaskDetail() {
   const [sub, setSub] = useState("");
   const { subscribe } = useEvents();
   const toast = useToast();
-  const { t } = useLang();
+  const { t, lang } = useLang();
 
   const load = useCallback(() => api(`/api/tasks/${id}`).then(setTask).catch(() => {}), [id]);
 
@@ -39,7 +39,7 @@ export default function TaskDetail() {
   }, [id, load, subscribe]);
 
   if (!task) return <Skeleton rows={4} />;
-  const [label, cls] = STATUS_LABEL[task.status] || [task.status, "bg-slate-100"];
+  const [label, cls] = statusLabel(task.status, lang);
 
   const nodes: Node[] = task.pipeline.map((s: any, i: number) => ({
     id: String(i),
@@ -70,7 +70,7 @@ export default function TaskDetail() {
         <div className="mb-1 flex flex-wrap justify-between text-sm">
           <span>{t("taskDetail.totalProgress")} {Math.round((task.progress || 0) * 100)}%{sub ? ` · ${sub}` : ""}</span>
           <span className="text-slate-500">
-            {task.status === "RUNNING" && task.eta_ts ? fmtEta(task.eta_ts) : ""}
+            {task.status === "RUNNING" && task.eta_ts ? fmtEta(task.eta_ts, lang) : ""}
             {task.status === "DONE" ? `${t("taskDetail.finishedAt")} ${fmtTime(task.finished_at)}` : ""}
           </span>
         </div>

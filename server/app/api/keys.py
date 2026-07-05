@@ -26,16 +26,16 @@ class KeyIn(BaseModel):
 def add_key(body: KeyIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     key = providers.normalize_key(body.raw_key)
     if not key or len(key) < 10:
-        raise HTTPException(400, "Key 为空或过短，请检查粘贴内容")
+        raise HTTPException(400, "Key is empty or too short - check what you pasted")
     provider = body.provider or providers.detect_provider(key, body.base_url)
     if not provider:
         return {"need_provider": True, "normalized": providers.mask(key),
-                "message": "无法自动识别厂商（Qwen / OpenAI / DeepSeek 前缀相同），请手动选择后重试",
+                "message": "Could not auto-detect the provider (Qwen / OpenAI / DeepSeek share the sk- prefix) - pick one manually and retry",
                 "options": providers.PROVIDERS}
     if provider not in providers.PROVIDERS:
-        raise HTTPException(400, f"未知厂商：{provider}")
+        raise HTTPException(400, f"Unknown provider: {provider}")
 
-    probe_msg = "未探活（已跳过）"
+    probe_msg = "Probe skipped"
     if not body.skip_probe:
         ok, probe_msg = providers.probe(provider, key, body.base_url)
         if not ok:
@@ -61,9 +61,9 @@ def list_keys(user: User = Depends(current_user), db: Session = Depends(get_db))
 def delete_key(key_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
     row = db.execute(select(ApiKey).where(ApiKey.id == key_id)).scalar_one_or_none()
     if not row:
-        raise HTTPException(404, "Key 不存在")
+        raise HTTPException(404, "Key not found")
     if user.role != "admin" and row.owner_id != user.id:
-        raise HTTPException(403, "无权删除他人的 Key")
+        raise HTTPException(403, "Cannot delete another user's key")
     db.delete(row)
     return {"ok": True}
 
@@ -72,7 +72,7 @@ def delete_key(key_id: str, user: User = Depends(current_user), db: Session = De
 def reprobe(key_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
     row = db.execute(select(ApiKey).where(ApiKey.id == key_id)).scalar_one_or_none()
     if not row:
-        raise HTTPException(404, "Key 不存在")
+        raise HTTPException(404, "Key not found")
     ok, msg = providers.probe(row.provider, providers.decrypt_key(row.encrypted_key), row.base_url)
     row.status = "active" if ok else "broken"
     return {"ok": ok, "message": msg, "status": row.status}

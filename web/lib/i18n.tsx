@@ -39,7 +39,7 @@ const DICT = {
     "taskDetail.requeued": "已从检查点重新排队", "taskDetail.cancelled": "任务已取消",
 
     "subs.hint": "添加后系统 7×24 自动轮询 arXiv、去重、初筛、归档并总结新论文——你的电脑可以关机。",
-    "subs.queryPlaceholder": "arXiv 关键词，如：counterfactual regret minimization",
+    "subs.queryPlaceholder": "arXiv 关键词，如：LLM agent security / portfolio optimization",
     "subs.add": "添加订阅", "subs.every1h": "每 1 小时", "subs.every6h": "每 6 小时",
     "subs.every12h": "每 12 小时", "subs.everyDay": "每天",
     "subs.empty": "还没有订阅", "subs.emptyHint": "添加一个研究关键词，系统就会自动帮你盯着新论文。",
@@ -145,7 +145,7 @@ const DICT = {
     "taskDetail.requeued": "Requeued from checkpoint", "taskDetail.cancelled": "Task cancelled",
 
     "subs.hint": "The system polls arXiv 24/7, dedupes, filters, archives, and summarizes new papers — your computer can be off.",
-    "subs.queryPlaceholder": "arXiv keyword, e.g. counterfactual regret minimization",
+    "subs.queryPlaceholder": "arXiv keyword, e.g. LLM agent security / portfolio optimization",
     "subs.add": "Add subscription", "subs.every1h": "Every hour", "subs.every6h": "Every 6 hours",
     "subs.every12h": "Every 12 hours", "subs.everyDay": "Daily",
     "subs.empty": "No subscriptions yet", "subs.emptyHint": "Add a research keyword and the system will watch for new papers automatically.",

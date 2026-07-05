@@ -37,20 +37,22 @@ def _parse_prompt(prompt: str) -> tuple[str, dict, str]:
     """自然语言 → 任务。V1 规则解析（0 token），V2 换轻量层模型解析。"""
     p = prompt.strip()
     lowered = p.lower()
-    if any(k in lowered for k in ("简报", "briefing", "日报")):
-        return "briefing", {}, "晨间简报"
+    if any(k in lowered for k in ("简报", "briefing", "日报", "digest")):
+        return "briefing", {}, "Morning briefing"
     # 默认视为文献跟踪/调研请求，提取主题
-    for prefix in ("帮我调研", "调研", "跟踪", "检索", "查找", "搜索", "search", "survey"):
-        if p.startswith(prefix):
+    for prefix in ("帮我调研", "调研", "跟踪", "检索", "查找", "搜索",
+                   "research the latest progress on", "track new papers on", "track", "watch",
+                   "research", "survey recent work on", "survey", "search", "find", "monitor"):
+        if lowered.startswith(prefix):
             p = p[len(prefix):].strip("：: ，, ")
             break
-    return "arxiv_watch", {"query": p or "LLM agents", "max_results": 15}, f"文献跟踪:{p[:40]}"
+    return "arxiv_watch", {"query": p or "LLM agents", "max_results": 15}, f"Watch: {p[:40]}"
 
 
 @router.post("")
 def create_task(body: TaskIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     if user.role == "viewer":
-        raise HTTPException(403, "viewer 无权创建任务")
+        raise HTTPException(403, "Viewers cannot create tasks")
     if body.template_id:
         try:
             ttype, params, title = apply_template(body.template_id, body.template_values)
@@ -61,9 +63,9 @@ def create_task(body: TaskIn, user: User = Depends(current_user), db: Session = 
     elif body.prompt:
         ttype, params, title = _parse_prompt(body.prompt)
     else:
-        raise HTTPException(400, "需要 type、prompt 或 template_id")
+        raise HTTPException(400, "type, prompt, or template_id required")
     if ttype not in REGISTRY:
-        raise HTTPException(400, f"未知任务类型：{ttype}，可用：{list(REGISTRY)}")
+        raise HTTPException(400, f"Unknown task type: {ttype}; available: {list(REGISTRY)}")
     task = Task(type=ttype, title=title, params_json=json.dumps(params, ensure_ascii=False),
                 owner_id=user.id, priority=body.priority, budget_limit_usd=body.budget_limit_usd)
     db.add(task)
@@ -93,9 +95,9 @@ def _brief(t: Task) -> dict:
 def task_detail(task_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
     t = db.execute(select(Task).where(Task.id == task_id)).scalar_one_or_none()
     if not t:
-        raise HTTPException(404, "任务不存在")
+        raise HTTPException(404, "Task not found")
     if user.role != "admin" and t.owner_id != user.id:
-        raise HTTPException(403, "无权查看")
+        raise HTTPException(403, "Not allowed to view this task")
     steps = REGISTRY.get(t.type, [])
     cp = latest_checkpoint(db, t.id)
     done_index = cp.step_index if cp else -1
@@ -124,9 +126,9 @@ def rerun(task_id: str, user: User = Depends(current_user), db: Session = Depend
     """从最后检查点重新排队（FAILED/SUSPENDED/DONE 均可）。"""
     t = db.execute(select(Task).where(Task.id == task_id)).scalar_one_or_none()
     if not t:
-        raise HTTPException(404, "任务不存在")
+        raise HTTPException(404, "Task not found")
     if user.role != "admin" and t.owner_id != user.id:
-        raise HTTPException(403, "无权操作")
+        raise HTTPException(403, "Not allowed to operate on this task")
     t.status = "QUEUED"
     t.error = ""
     t.finished_at = 0
@@ -137,9 +139,9 @@ def rerun(task_id: str, user: User = Depends(current_user), db: Session = Depend
 def cancel(task_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
     t = db.execute(select(Task).where(Task.id == task_id)).scalar_one_or_none()
     if not t:
-        raise HTTPException(404, "任务不存在")
+        raise HTTPException(404, "Task not found")
     if user.role != "admin" and t.owner_id != user.id:
-        raise HTTPException(403, "无权操作")
+        raise HTTPException(403, "Not allowed to operate on this task")
     if t.status in ("QUEUED", "SUSPENDED", "WAITING_APPROVAL"):
         t.status = "CANCELLED"
     return {"ok": True, "status": t.status}

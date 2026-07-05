@@ -22,26 +22,27 @@ def step_gather(ctx: TaskContext, state: dict) -> dict:
     state["items"] = [
         {"title": p.title, "url": p.url, "summary": s.content_md[:1200]} for s, p in rows
     ]
-    ctx.artifact("素材清单", f"近 24 小时共 {len(state['items'])} 篇总结")
+    ctx.artifact("Source material", f"{len(state['items'])} summaries from the last 24h")
     return state
 
 
 def step_compose(ctx: TaskContext, state: dict) -> dict:
     items = state["items"]
     if not items:
-        state["briefing_md"] = "## 今日简报\n\n过去 24 小时没有新论文动态。"
+        state["briefing_md"] = "## Today's briefing\n\nNo new papers in the last 24 hours."
         return state
     material = "\n\n---\n\n".join(f"### {it['title']}\n{it['summary']}" for it in items[:20])
     prompt = (
-        "你是科研助理。根据以下论文总结素材，写一份中文晨间简报（Markdown）："
-        "开头 2-3 句话概括今日要点；然后每篇论文 2-3 句话要点 + 一句'为什么值得看'。"
-        "简明、信息密度高、不要空话。\n\n" + material
+        "You are a research assistant. From the paper summaries below, write a morning "
+        "briefing in Markdown: open with 2-3 sentences on today's key takeaways, then for "
+        "each paper give 2-3 sentences of highlights plus one line on why it's worth reading. "
+        "Concise, information-dense, no filler.\n\n" + material
     )
     result = llm.complete(ctx.db, prompt, tier=policy.TIER_LIGHT, task=ctx.task,
                           step="compose", max_tokens=2000)
     # 简报末尾附原文链接（本地拼接，0 token）
     links = "\n".join(f"- [{it['title']}]({it['url']})" for it in items)
-    state["briefing_md"] = result.text + "\n\n## 原文链接\n" + links
+    state["briefing_md"] = result.text + "\n\n## Links\n" + links
     return state
 
 
@@ -49,8 +50,8 @@ def step_save(ctx: TaskContext, state: dict) -> dict:
     date = time.strftime("%Y-%m-%d")
     ctx.db.add(Briefing(date=date, content_md=state["briefing_md"], owner_id=ctx.task.owner_id))
     bus.publish("briefing_ready", {"date": date, "task_id": ctx.task.id})
-    notify_all(ctx.db, f"AAOS 简报 {date}", state["briefing_md"][:3500])
-    ctx.artifact("简报", state["briefing_md"][:2000])
+    notify_all(ctx.db, f"JarvisQwen briefing {date}", state["briefing_md"][:3500])
+    ctx.artifact("Briefing", state["briefing_md"][:2000])
     return state
 
 

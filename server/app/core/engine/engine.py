@@ -68,7 +68,7 @@ class TaskContext:
             if row and row.status == "approved":
                 return
             if row and row.status == "rejected":
-                raise TaskFailed(f"操作被拒绝：{desc}")
+                raise TaskFailed(f"Action rejected: {desc}")
         raise NeedApproval(desc, risk)
 
 
@@ -131,7 +131,7 @@ def run_task(db: Session, task: Task) -> None:
     steps = REGISTRY.get(task.type)
     if not steps:
         task.status = "FAILED"
-        task.error = f"未知任务类型：{task.type}"
+        task.error = f"Unknown task type: {task.type}"
         return
 
     cp = latest_checkpoint(db, task.id)
