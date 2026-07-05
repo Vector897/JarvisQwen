@@ -1,43 +1,35 @@
-# JarvisQwen — Your 24/7 Research Autopilot on Qwen Cloud
+# JarvisQwen — The Autopilot Control Plane for Knowledge Work, on Qwen Cloud
 
 > **Track: Autopilot Agent** · Global AI Hackathon (Qwen Cloud) · [中文文档 →](README.zh.md)
 
-**JarvisQwen is an autonomous agent that monitors, triages, deep-reads, archives, and briefs the world's research for you — end to end, around the clock — while you sleep.** It orchestrates the entire Qwen model family (`qwen3.6-flash` → `qwen3.7-plus` → `qwen3.7-max`) through a cost-aware three-tier router, so every token is spent on the *cheapest model that can do the job*.
+Most of knowledge work follows one loop: **watch sources → triage what matters → process it deeply → deliver a briefing → learn from feedback.** Researchers run it over papers. Analysts run it over competitor moves. Legal teams run it over regulations. Security teams run it over CVE advisories. Everyone runs it by hand, every day, forever.
 
-Most hackathon agents are demos you babysit. JarvisQwen is built to pass a harder test: **can you leave it alone for a month?** Hard budget cutoffs, crash-safe checkpoints, circuit breakers, PII redaction, human-in-the-loop approvals, and a full audit trail say yes.
+**JarvisQwen turns that loop into an autonomous, production-grade autopilot** on the Qwen model family — with a cost-aware three-tier router (`$0 rules → qwen3.6-flash → qwen3.7-max`) so every token is spent on the *cheapest model that can do the job*, and with the operational guarantees that let you leave it running unattended: hard budget cutoffs, crash-safe checkpoints, circuit breakers, PII redaction, human-in-the-loop approvals, and a full audit trail.
 
-```
-You subscribe to a topic once.
-Every morning, a briefing of what actually matters is waiting for you.
-Total cost: about the price of a coffee — per month, not per day.
-```
-
----
-
-## The problem
-
-arXiv alone publishes **500+ papers a day**. Every researcher, analyst, and R&D team runs the same manual loop: search → skim → judge relevance → download → read → summarize → repeat tomorrow. It consumes 1–2 hours daily, and the moment you stop, you fall behind.
-
-Naively automating this with a frontier LLM is worse: feeding 200 papers/day through a top-tier model costs **$10+/day**, and a single crashed run can silently re-bill everything.
-
-## What JarvisQwen does
-
-One subscription triggers a fully autonomous, self-correcting pipeline:
+This build ships the deepest vertical of that pattern: **research literature** — the workflow with the most brutal volume (arXiv alone: 500+ papers/day) and the most expensive naive automation ($10+/day if a frontier model reads everything).
 
 ```
-📡 Poll arXiv/Semantic Scholar   (pure code, $0)
- → 🧹 Dedupe by title+ID fingerprint   (pure code, $0)
- → 🎯 Relevance triage against your research profile   (qwen3.6-flash)
- → 📥 Download PDF + archive with metadata   (pure code, $0)
- → 📝 Deep per-paper summary: contributions, methods, relation to YOUR work   (qwen3.7-max)
- → 🧠 Write episodic memory → nightly consolidation into semantic memory   (qwen3.6-flash, off-peak)
- → 📰 Morning briefing pushed to web console / Telegram / email
- → 👍 Your "important / ignore" feedback loops back into future triage
+Subscribe to a topic once.
+Every morning, a briefing of what actually matters is waiting.
+It remembers what you cared about, and gets better at deciding for you.
+Cost: ~$0.30/day — 30× cheaper than the naive design.
 ```
 
-4 of the 8 stages cost exactly $0. The expensive model only ever sees the few papers that survive triage.
+## One pattern, many jobs
 
-### The cost math (real Qwen Cloud pricing)
+The pipeline is a template, not a hard-code. Same engine, different connector + prompts:
+
+| Vertical | Watch | Triage | Deep-process | Brief |
+|---|---|---|---|---|
+| **Research literature** *(shipped)* | arXiv / Semantic Scholar | relevance vs. your research profile | per-paper summary vs. YOUR work | morning digest |
+| Patent watch | patent office feeds | relevance to your claims | infringement/novelty analysis | weekly landscape |
+| Competitor intel | changelogs, pricing pages, press | material-change detection | impact analysis | Monday briefing |
+| Regulatory tracking | gazettes, agency feeds | applicability screening | compliance-gap summary | alert + digest |
+| Security advisories | CVE/NVD feeds | "does this hit our stack?" | exploitability + patch plan | on-call alert |
+
+What makes these viable isn't the prompts — it's the **shared infrastructure**: anything that runs 24/7 against a paid, metered API needs budget governance, crash recovery, and auditability. That's the actual product.
+
+## The cost math (real Qwen Cloud pricing)
 
 | Stage | Model | Price (in/out per MTok) | Typical daily cost* |
 |---|---|---|---|
@@ -47,26 +39,42 @@ One subscription triggers a fully autonomous, self-correcting pipeline:
 | Briefing + memory consolidation | `qwen3.6-flash` | $0.25 / $1.50 | ~$0.01 |
 | **Total** | | | **~$0.30/day** |
 
-*Tracking one active topic. A naive "frontier-model-reads-everything" design costs ~$10/day for the same coverage — **JarvisQwen is ~30× cheaper** at equal quality where quality matters.
+*One active topic. 4 of 8 pipeline stages are pure code at $0; the frontier model only ever sees what survives triage. A confidence cascade (flash answers first, self-scores, escalates only below threshold) and a 72h semantic cache cut this further.
 
-Semantic caching (72h TTL) and confidence-based cascading (flash answers first, self-scores, escalates to max only below threshold) cut this further.
+## Engineering depth — what separates this from demo agents
 
-## Why you can actually leave it alone
+### 🧠 A real memory subsystem, not a chat log
 
-This is the part that makes it an *autopilot* rather than a demo:
+- **Episodic → semantic lifecycle**: every task execution writes episodic memory; a nightly off-peak job (cheap flash tokens) consolidates recurring facts into long-term semantic memory ("user consistently prioritizes CFR forgetting papers; deprioritizes surveys").
+- **Temporal conflict arbitration**: when new facts contradict old ones, the system writes a reconciliation ("X held before 2026-05, updated to Y since") instead of blind overwrites — memories carry timestamps and confidence.
+- **Forgetting curve**: memory heat = access frequency × recency decay; cold memories are demoted out of the retrieval index (archived, not destroyed).
+- **Two-stage retrieval**: tag/domain filter first, then ranking — retrieval cost doesn't grow linearly with memory size.
+- **Closed feedback loop**: your "important / ignore" marks become semantic memory that measurably shifts future triage decisions. The autopilot gets better at *being you*.
 
-| Guarantee | Mechanism |
-|---|---|
-| **Never blows your budget** | Daily budget cap: alert at 80%, hard circuit-break at 100% — running tasks suspend instead of burning money. Every call is metered against the official Qwen price table ([`policy.py`](server/app/core/router/policy.py)). |
-| **Never pays twice** | Every pipeline step checkpoints its state. Crash, reboot, or network loss → resume from the last checkpoint. Paid intermediate results are never recomputed. |
-| **Never melts down retrying** | Exponential backoff with jitter, per-provider circuit breakers, and model fallback chains (`max → plus → flash`). Zombie tasks are reaped by a watchdog and re-queued. |
-| **Never leaks your data** | An egress redaction gateway (regex → entropy → NER, three layers) replaces PII/keys with placeholders before anything leaves the box, and restores them on return. High-sensitivity mode blocks egress outright. |
-| **Never acts beyond its authority** | Destructive/outbound operations queue for human approval; approved tasks resume seamlessly from checkpoint. Prompt-injection isolation wraps all external content as "data, not instructions". |
-| **Never lies about what it did** | Append-only audit log of every call: model, tokens, cost, input/output digests. Any conclusion traces back to the exact call that produced it. |
+### ⚙️ Orchestration built for long-running paid work
+
+- **Per-step checkpoints + artifacts**: every pipeline step snapshots state and emits a verifiable artifact (search list, archive manifest, summary draft). Crash → resume from the last checkpoint; **paid tokens are never spent twice**.
+- **Suspend / resume semantics**: tasks waiting on external events release their resources; timers and events wake them.
+- **Zombie watchdog + leases**: hung tasks are reclaimed and re-queued automatically; nothing silently occupies the queue.
+- **Live pipeline DAG with ETA**: every task renders as a color-coded React Flow graph; ETA is estimated from historical per-step medians and corrected as the run progresses.
+- **HITL interrupts**: destructive/outbound steps pause into an approval inbox and resume from checkpoint after sign-off — the pipeline doesn't restart, it *continues*.
+
+### 💰 Cost governance you can bet a credit card on
+
+- **Single egress choke point** ([`llm.py`](server/app/core/router/llm.py)): every LLM call in the system passes `redact → semantic cache → budget guard → tier router → resilient call → audit` — in that order, no exceptions, by construction.
+- **Exact metering** at official Qwen prices ([`policy.py`](server/app/core/router/policy.py)) — the budget breaker (alert at 80%, hard trip at 100%) is only as good as its meter.
+- **Resilience chain**: exponential backoff with jitter → per-provider circuit breakers → model fallback (`max → plus → flash`). Retry storms are structurally impossible.
+
+### 🔒 Security as a pipeline stage, not an afterthought
+
+- **Three-layer egress redaction** (regex → entropy → NER): PII and credentials become placeholders before leaving the box, restored on return; highest sensitivity blocks egress outright.
+- **Prompt-injection isolation**: external content is wrapped as "material, not instructions"; outputs scanned for exfiltration patterns.
+- **RBAC + ownership-filtered retrieval**: unauthorized content is filtered *before* it can enter a model context.
+- **Append-only audit**: model, tokens, cost, and I/O digests per call — every conclusion traceable to the exact call that produced it.
 
 ## Architecture
 
-**Control plane / execution plane separation** — a cheap, always-on scheduler (runs on a 1-core CPU VM) commands expensive, on-demand Qwen models. Think Kubernetes vs. containers.
+**Control plane / execution plane separation** — a cheap, always-on scheduler (1-core CPU VM on Alibaba Cloud ECS) commands expensive, on-demand Qwen models. Think Kubernetes vs. containers.
 
 ```mermaid
 flowchart TB
@@ -79,7 +87,7 @@ flowchart TB
         SCHED["Scheduler<br/>queue · leases · watchdog · cron polling"]
         ENGINE["Task engine<br/>checkpoints · artifacts · ETA · HITL interrupts"]
         LLM["llm.py — single egress point<br/>redact → cache → budget → route → resilience → audit"]
-        MEM["Memory<br/>episodic → nightly consolidation → semantic"]
+        MEM["Memory<br/>episodic → nightly consolidation → semantic<br/>conflict arbitration · forgetting curve"]
         DB[("SQLite<br/>tasks · papers · memory · audit")]
     end
 
@@ -89,7 +97,7 @@ flowchart TB
         MAX["qwen3.7-max<br/>deep summaries · reviews<br/>$2.50/MTok"]
     end
 
-    ARXIV["arXiv / Semantic Scholar<br/>(free public APIs)"]
+    ARXIV["Source connectors<br/>arXiv / Semantic Scholar (shipped)<br/>patents / feeds / advisories (template)"]
 
     B -- HTTPS --> GW
     GW --> SCHED --> ENGINE --> LLM
@@ -101,8 +109,6 @@ flowchart TB
     LLM -- "frontier tier, only when needed" --> MAX
 ```
 
-Every LLM request in the system flows through **one** choke point — [`server/app/core/router/llm.py`](server/app/core/router/llm.py) — where six stages are applied in order: **redaction → semantic cache → budget guard → tier routing → resilient call (backoff / breaker / fallback) → audit accounting**. No prompt can bypass safety or metering by construction.
-
 ### Qwen Cloud integration points
 
 | Concern | Where |
@@ -110,6 +116,7 @@ Every LLM request in the system flows through **one** choke point — [`server/a
 | OpenAI-compatible endpoint (`dashscope-intl.aliyuncs.com/compatible-mode/v1`) | [`providers.py`](server/app/core/router/providers.py) — `QWEN_BASE_URL`, `litellm_route()` |
 | Default three-tier routing over the Qwen family | [`settings_store.py`](server/app/core/settings_store.py) |
 | Exact per-call cost accounting at official Qwen prices | [`policy.py`](server/app/core/router/policy.py) — `QWEN_PRICING`, `exact_cost()` |
+| Zero-click cloud key config (`DASHSCOPE_API_KEY` auto-import on boot) | [`providers.py`](server/app/core/router/providers.py) — `import_env_keys()` |
 | Key validation live-probe against `qwen3.6-flash` | [`providers.py`](server/app/core/router/providers.py) — `probe()` |
 | Confidence cascade (flash first, escalate to max) | [`cascade.py`](server/app/core/router/cascade.py) |
 
@@ -128,7 +135,7 @@ cd web
 npm install && npm run dev                     # http://localhost:3000
 ```
 
-With no API key configured the system runs in **dry-run mode**: the full pipeline executes with simulated LLM responses at zero cost. Paste a [Qwen Cloud API key](https://docs.qwencloud.com/developer-guides/administration/api-keys) in **Settings** to go live — it is auto-normalized, provider-detected, live-probed, and stored Fernet-encrypted.
+With no API key configured the system runs in **dry-run mode**: the full pipeline executes with simulated LLM responses at zero cost. To go live, either paste a [Qwen Cloud API key](https://docs.qwencloud.com/developer-guides/administration/api-keys) in **Settings** (auto-normalized, provider-detected, live-probed, Fernet-encrypted) or just put `DASHSCOPE_API_KEY=sk-...` in a `.env` at the repo root — it's imported automatically on boot.
 
 ### 2. Alibaba Cloud ECS (production)
 
@@ -136,11 +143,11 @@ With no API key configured the system runs in **dry-run mode**: the full pipelin
 curl -fsSL https://raw.githubusercontent.com/Vector897/JarvisQwen/main/install.sh | bash
 ```
 
-Open `http://<ECS-IP>:3000`, log in with the generated password in `data/admin_password.txt`, paste your `DASHSCOPE_API_KEY`, add a subscription. Done — your first briefing arrives tomorrow morning. All state lives in `./data`; migrating hosts is copy-and-compose-up.
+Open `http://<ECS-IP>:3000`, log in with the generated password in `data/admin_password.txt`, add your key, add a subscription. Done — your first briefing arrives tomorrow morning. All state lives in `./data`; migrating hosts is copy-and-compose-up.
 
 ## Console
 
-Responsive Next.js PWA (add-to-home-screen on mobile): live pipeline DAG per task (React Flow, color-coded steps, ETA), cost dashboard with budget progress, subscription manager, searchable knowledge library with cross-paper QA, approval inbox, audit trail, bilingual UI (EN/中文), dark mode.
+Responsive Next.js PWA (add-to-home-screen on mobile), **English by default, 中文 toggle**: live pipeline DAG per task, cost dashboard with budget progress, subscription manager, searchable knowledge library with cross-paper QA, approval inbox, audit trail, dark mode.
 
 ## Tests
 
@@ -149,10 +156,6 @@ cd server
 .venv/bin/python -m pytest          # routing / redaction / breaker / checkpoint / budget
 .venv/bin/python tests/smoke_e2e.py # boot → login → task → pipeline → audit
 ```
-
-## Beyond research papers
-
-The pipeline is a template, not a hard-code: *poll → filter cheap → act expensive → brief → learn from feedback* generalizes to patent watch, competitor monitoring, regulatory tracking, and security-advisory triage. The task-template system ships with the research vertical as its flagship.
 
 ## License
 

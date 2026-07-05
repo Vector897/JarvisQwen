@@ -45,7 +45,7 @@ DEFAULTS: dict[str, Any] = {
     "zotero_library_type": "user",
     # 界面
     "ui_theme": "light",  # light/dark（也存一份在 localStorage，这里做跨设备记忆）
-    "ui_lang": "zh",  # zh/en
+    "ui_lang": "en",  # en/zh
 }
 
 SECRET_KEYS = {  # 这些 key 在 GET /api/settings 中掩码返回，避免明文泄露给前端

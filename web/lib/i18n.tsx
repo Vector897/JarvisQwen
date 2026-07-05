@@ -228,14 +228,14 @@ type Lang = keyof typeof DICT;
 type Key = keyof typeof DICT["zh"];
 
 const LangCtx = createContext<{ lang: Lang; t: (k: Key) => string; toggle: () => void }>({
-  lang: "zh",
-  t: (k) => DICT.zh[k] ?? k,
+  lang: "en",
+  t: (k) => DICT.en[k] ?? k,
   toggle: () => {},
 });
 export const useLang = () => useContext(LangCtx);
 
 export function LangProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLang] = useState<Lang>("zh");
+  const [lang, setLang] = useState<Lang>("en");
 
   useEffect(() => {
     const saved = localStorage.getItem("aaos-lang") as Lang | null;
@@ -248,7 +248,7 @@ export function LangProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("aaos-lang", next);
   }
 
-  const t = (k: Key) => DICT[lang][k] ?? DICT.zh[k] ?? k;
+  const t = (k: Key) => DICT[lang][k] ?? DICT.en[k] ?? k;
 
   return <LangCtx.Provider value={{ lang, t, toggle }}>{children}</LangCtx.Provider>;
 }
