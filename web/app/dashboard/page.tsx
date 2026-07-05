@@ -9,19 +9,29 @@ import { Skeleton } from "@/components/ui";
 import { BarChart, ModelBreakdown } from "@/components/cost-chart";
 import { useLang } from "@/lib/i18n";
 
+const TIERS = [
+  ["Rule tier", "— pure code", "$0", ["Poll · dedupe · archive · notify", "轮询 · 去重 · 归档 · 推送"]],
+  ["Light tier", "qwen3.6-flash", "$0.25 / $1.50", ["Triage · briefings · NLU", "初筛 · 简报 · 指令解析"]],
+  ["Fallback", "qwen3.7-plus", "$0.40 / $1.60", ["Resilience chain", "弹性降级链"]],
+  ["Frontier", "qwen3.7-max", "$2.50 / $7.50", ["Deep summaries only", "仅深度总结"]],
+] as const;
+
 export default function Dashboard() {
   const [data, setData] = useState<any>(null);
   const [costs, setCosts] = useState<any>(null);
+  const [calls, setCalls] = useState<any[]>([]);
   const { subscribe } = useEvents();
   const toast = useToast();
-  const { t } = useLang();
+  const { t, lang } = useLang();
 
   const load = () => api("/api/dashboard").then(setData).catch(() => {});
   const loadCosts = () => api("/api/dashboard/costs?days=7").then(setCosts).catch(() => {});
+  const loadCalls = () => api("/api/audit?limit=6").then(setCalls).catch(() => {});
 
   useEffect(() => {
     load();
     loadCosts();
+    loadCalls();
     return subscribe((type, ev) => {
       if (type === "budget_alert") {
         toast(
@@ -30,7 +40,7 @@ export default function Dashboard() {
         );
         load();
       }
-      if (["task_done", "task_failed", "briefing_ready"].includes(type)) { load(); loadCosts(); }
+      if (["task_done", "task_failed", "briefing_ready"].includes(type)) { load(); loadCosts(); loadCalls(); }
     });
   }, [subscribe]);
 
@@ -80,6 +90,79 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* 最近 LLM 调用 */}
+        <div className="card overflow-x-auto">
+          <div className="mb-2 flex items-center justify-between text-sm">
+            <span className="font-medium">{lang === "zh" ? "最近 LLM 调用" : "Recent LLM calls"}</span>
+            <Link href="/audit" className="text-xs text-blue-600 hover:underline">
+              {lang === "zh" ? "完整审计 →" : "Full audit →"}
+            </Link>
+          </div>
+          {calls.length ? (
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-slate-400 dark:border-slate-700">
+                  <th className="py-1.5 pr-2 font-medium">{lang === "zh" ? "时间" : "Time"}</th>
+                  <th className="py-1.5 pr-2 font-medium">{lang === "zh" ? "模型" : "Model"}</th>
+                  <th className="py-1.5 pr-2 font-medium">{lang === "zh" ? "步骤" : "Step"}</th>
+                  <th className="py-1.5 pr-2 text-right font-medium">Tokens</th>
+                  <th className="py-1.5 text-right font-medium">{lang === "zh" ? "费用" : "Cost"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {calls.map((c) => (
+                  <tr key={c.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                    <td className="py-1.5 pr-2 text-slate-400">
+                      {new Date(c.ts * 1000).toLocaleTimeString(lang === "zh" ? "zh-CN" : "en-GB",
+                        { hour: "2-digit", minute: "2-digit" })}
+                    </td>
+                    <td className="py-1.5 pr-2 font-mono">{c.model.replace("qwen/", "")}</td>
+                    <td className="py-1.5 pr-2 text-slate-500">{c.step}</td>
+                    <td className="py-1.5 pr-2 text-right font-mono text-slate-500">{c.tokens_in}→{c.tokens_out}</td>
+                    <td className="py-1.5 text-right font-mono">${c.cost_usd.toFixed(4)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="text-xs text-slate-400">{lang === "zh" ? "暂无调用记录" : "No calls yet"}</p>
+          )}
+        </div>
+
+        {/* Qwen 三级路由价目 */}
+        <div className="card overflow-x-auto">
+          <div className="mb-2 text-sm font-medium">
+            {lang === "zh" ? "三级路由 · Qwen 全家桶价目" : "Tiered routing · the Qwen family"}
+          </div>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-slate-400 dark:border-slate-700">
+                <th className="py-1.5 pr-2 font-medium">{lang === "zh" ? "层级" : "Tier"}</th>
+                <th className="py-1.5 pr-2 font-medium">{lang === "zh" ? "模型" : "Model"}</th>
+                <th className="py-1.5 pr-2 font-medium">{lang === "zh" ? "单价 /MTok" : "Price /MTok"}</th>
+                <th className="py-1.5 font-medium">{lang === "zh" ? "职责" : "Handles"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {TIERS.map(([tier, model, price, duty]) => (
+                <tr key={tier} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                  <td className="py-1.5 pr-2 font-medium">{tier}</td>
+                  <td className="py-1.5 pr-2 font-mono">{model}</td>
+                  <td className="py-1.5 pr-2 font-mono">{price}</td>
+                  <td className="py-1.5 text-slate-500">{lang === "zh" ? duty[1] : duty[0]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="mt-2 text-xs text-slate-400">
+            {lang === "zh"
+              ? "每个 token 都花在能干这活的最便宜模型上——这是 ~$0.30/天 的由来。"
+              : "Every token goes to the cheapest model that can do the job — that's how ~$0.30/day happens."}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

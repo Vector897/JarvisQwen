@@ -38,3 +38,7 @@ Thumbs.db
 *.docx
 !README.md
 !README.zh.md
+# App assets are the exception — the web UI needs them
+!web/public/*.png
+!web/public/*.svg
+!web/public/*.jpg

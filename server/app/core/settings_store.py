@@ -31,6 +31,7 @@ DEFAULTS: dict[str, Any] = {
     "notify_telegram_enabled": False,
     "telegram_bot_token": "",
     "telegram_chat_id": "",
+    "telegram_update_offset": 0,  # 遥控轮询的 getUpdates 游标
     "notify_email_enabled": False,
     "smtp_host": "",
     "smtp_port": 587,

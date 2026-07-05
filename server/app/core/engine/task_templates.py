@@ -19,6 +19,30 @@ TEMPLATES = [
         ],
     },
     {
+        "id": "security_watch",
+        "name": "Security watch",
+        "description": "Track security research the way an on-call team tracks advisories — "
+                       "new attack & defense work on your stack, triaged and summarized",
+        "task_type": "arxiv_watch",
+        "fields": [
+            {"key": "query", "label": "What to guard", "type": "text",
+             "placeholder": "e.g. prompt injection defense / container escape"},
+            {"key": "max_results", "label": "Papers per poll", "type": "number", "default": 15},
+        ],
+    },
+    {
+        "id": "market_watch",
+        "name": "Market & finance watch",
+        "description": "Follow quantitative finance and economics preprints — portfolio "
+                       "methods, risk models, forecasting — briefed every morning",
+        "task_type": "arxiv_watch",
+        "fields": [
+            {"key": "query", "label": "Market topic", "type": "text",
+             "placeholder": "e.g. portfolio optimization / volatility forecasting"},
+            {"key": "max_results", "label": "Papers per poll", "type": "number", "default": 15},
+        ],
+    },
+    {
         "id": "proposal_research",
         "name": "Deep-dive survey",
         "description": "One focused sweep over a specific question — search wide, triage, "

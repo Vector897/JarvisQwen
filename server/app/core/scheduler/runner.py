@@ -123,6 +123,8 @@ def start(scheduler) -> threading.Thread:
         consolidate_hour = int(get_setting(db, "consolidate_hour"))
     scheduler.add_job(watchdog, "interval", seconds=60, id="watchdog")
     scheduler.add_job(check_subscriptions, "interval", minutes=5, id="subscriptions")
+    from ...connectors.telegram_bot import poll_commands
+    scheduler.add_job(poll_commands, "interval", seconds=20, id="telegram_remote")
     scheduler.add_job(nightly_consolidate, "cron", hour=consolidate_hour, id="consolidate")
     scheduler.add_job(daily_briefing, "cron", hour=briefing_hour, minute=30, id="briefing")
     return thread

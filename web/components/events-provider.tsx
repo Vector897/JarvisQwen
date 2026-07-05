@@ -24,7 +24,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (pathname === "/login") return; // 未登录页不建连（避免 401 重连风暴）
+    if (pathname === "/login" || pathname === "/home") return; // 未登录页不建连（避免 401 重连风暴）
     const es = new EventSource("/api/events");
     es.onopen = () => setStatus("online");
     es.onerror = () => setStatus("offline"); // 浏览器会自动重连

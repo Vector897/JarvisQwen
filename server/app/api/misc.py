@@ -156,6 +156,13 @@ def write_settings(body: SettingsIn, user: User = Depends(require_admin),
     return {"ok": True}
 
 
+@router.get("/telegram/bot")
+def telegram_bot_info(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """/connect 页二维码所需的 bot 配置状态与用户名。"""
+    from ..connectors.telegram_bot import bot_info
+    return bot_info(db)
+
+
 @router.post("/settings/test-notify")
 def test_notify(user: User = Depends(require_admin), db: Session = Depends(get_db)):
     results = notify_all(db, "JarvisQwen test push", "If you can read this, push notifications are configured correctly ✅")

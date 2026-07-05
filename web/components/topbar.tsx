@@ -12,6 +12,7 @@ const TITLES: Record<string, [string, string]> = {
   "/subscriptions": ["订阅", "Subscriptions"], "/library": ["知识库", "Library"],
   "/briefings": ["简报", "Briefings"], "/approvals": ["审批", "Approvals"],
   "/audit": ["审计", "Audit"], "/settings": ["设置", "Settings"], "/help": ["帮助", "Help"],
+  "/connect": ["手机遥控", "Connect"], "/deploy": ["一键部署", "Deploy"],
 };
 
 const DOT: Record<string, [string, string]> = {
@@ -29,11 +30,11 @@ export function Topbar() {
   const [user, setUser] = useState<{ name: string; role: string } | null>(null);
 
   useEffect(() => {
-    if (pathname === "/login") return;
+    if (pathname === "/login" || pathname === "/home") return;
     api("/api/auth/me").then(setUser).catch(() => {});
   }, [pathname]);
 
-  if (pathname === "/login") return null;
+  if (pathname === "/login" || pathname === "/home") return null;
   const titlePair = Object.entries(TITLES).find(([p]) => pathname.startsWith(p))?.[1];
   const title = titlePair ? (lang === "zh" ? titlePair[0] : titlePair[1]) : "JarvisQwen";
   const [dotCls, dotKey] = DOT[status] as [string, "topbar.online" | "topbar.offline"];
