@@ -16,8 +16,9 @@ class Config(BaseSettings):
     port: int = 8000
     daily_budget_usd: float = 2.0
     web_origin: str = ""  # 模式 B 的 Vercel 域名（CORS 兜底）
-    ratelimit_enabled: bool = True  # 入站 IP 限流（公网部署防扫描/洪水）
-    ratelimit_rpm: int = 240        # 每 IP 每分钟请求上限；正常使用远达不到
+    ratelimit_enabled: bool = True  # 入站限流（公网部署防扫描/洪水）
+    ratelimit_rpm: int = 240        # 每分钟请求上限；正常使用远达不到
+    access_code: str = ""           # 设置后，/api 需带此访问码（cookie/?k=/header）；空=完全开放
 
     @property
     def db_url(self) -> str:

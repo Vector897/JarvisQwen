@@ -73,7 +73,7 @@ What makes these viable isn't the prompts — it's the **shared infrastructure**
 - **Prompt-injection isolation**: external content is wrapped as "material, not instructions"; outputs scanned for exfiltration patterns.
 - **RBAC + ownership-filtered retrieval**: unauthorized content is filtered *before* it can enter a model context.
 - **Append-only audit**: model, tokens, cost, and I/O digests per call — every conclusion traceable to the exact call that produced it.
-- **Hardened public exposure**: inbound per-IP rate limiting (pure-ASGI middleware, configurable via `AAOS_RATELIMIT_RPM`, default 240/min) shields the always-on control-plane VM from internet scanning and request floods; the backend API port is bound to `127.0.0.1` only — never published to the public internet — so the sole public attack surface is the web tier that proxies `/api`.
+- **Hardened public exposure**: an optional access code (`AAOS_ACCESS_CODE`) gates every `/api` call so a public demo can't be used to burn your API budget — share it as a one-click magic link (`/?k=<code>`); inbound rate limiting (pure-ASGI middleware, `AAOS_RATELIMIT_RPM`, default 240/min) shields the always-on VM from request floods; and the backend API port is bound to `127.0.0.1` only — never published to the public internet — so the sole public attack surface is the web tier that proxies `/api`.
 
 ## Architecture
 

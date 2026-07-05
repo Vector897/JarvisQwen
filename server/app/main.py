@@ -17,6 +17,7 @@ from .config import config
 from .core.engine import graphs  # noqa: F401  导入即注册任务图
 from .core.router import providers
 from .core.scheduler import runner
+from .access import AccessGateMiddleware
 from .db import init_db
 from .ratelimit import RateLimitMiddleware
 
@@ -39,7 +40,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AAOS", version=__version__, lifespan=lifespan)
 
-if config.ratelimit_enabled:  # 入站 IP 限流（最外层，先于路由处理）
+if config.access_code:  # 可选访问码闸门（公网演示防陌生人烧额度）
+    app.add_middleware(AccessGateMiddleware, code=config.access_code)
+
+if config.ratelimit_enabled:  # 入站限流（最外层，先于路由处理）
     app.add_middleware(RateLimitMiddleware, rpm=config.ratelimit_rpm)
 
 if config.web_origin:  # 模式 B 且未走 Vercel rewrites 时的 CORS 兜底
