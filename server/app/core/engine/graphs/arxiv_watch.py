@@ -9,7 +9,7 @@ import json
 
 from sqlalchemy import select
 
-from ....connectors import arxiv, pdf_ingest
+from ....connectors import arxiv, news, pdf_ingest
 from ....models import Paper, Summary
 from ...bus import bus
 from ...memory import memory
@@ -24,10 +24,23 @@ def fingerprint(title: str, arxiv_id: str) -> str:
 
 
 def step_fetch(ctx: TaskContext, state: dict) -> dict:
+    """抓取候选条目。学术话题走 arXiv；股票/财经/时事等非学术话题走新闻源；
+    arXiv 无结果时也自动回退到新闻，保证"任意查询都有结果"。"""
     params = state["params"]
-    found = arxiv.search(params.get("query", "LLM agents"), int(params.get("max_results", 15)))
+    query = params.get("query", "LLM agents")
+    n = int(params.get("max_results", 15))
+    if news.is_news_query(query):
+        found, source = news.search(query, n), "news"
+    else:
+        found = arxiv.search(query, n)
+        source = "arxiv"
+        if not found:  # 冷门/非英文话题 arXiv 常空 → 退回新闻
+            found, source = news.search(query, n), "news"
     state["found"] = found
-    ctx.artifact("Search results", "\n".join(f"- {p['title']} ({p['published_at']})" for p in found) or "(no results)")
+    state["source"] = source
+    unit = "papers" if source == "arxiv" else "news articles"
+    body = "\n".join(f"- {p['title']} ({p['published_at']})" for p in found) or "(no results)"
+    ctx.artifact("Search results", f"[source: {source} · {len(found)} {unit}]\n{body}")
     return state
 
 
@@ -50,7 +63,11 @@ def step_filter(ctx: TaskContext, state: dict) -> dict:
     if not fresh:
         state["selected"] = []
         return state
-    profile = str(get_setting(ctx.db, "research_profile")) or state["params"].get("query", "")
+    # 新闻按"查询词"判相关（命中查询的文章都相关）；论文按用户研究画像判相关。
+    if state.get("source") == "news":
+        profile = state["params"].get("query", "") or str(get_setting(ctx.db, "research_profile"))
+    else:
+        profile = str(get_setting(ctx.db, "research_profile")) or state["params"].get("query", "")
     listing = "\n".join(f"{i}. {p['title']} — {p['abstract'][:300]}" for i, p in enumerate(fresh))
     prompt = (
         f"My research focus: {profile}\n\nBelow are candidate papers. Score each for relevance (0-1). "
@@ -101,12 +118,19 @@ def step_summarize(ctx: TaskContext, state: dict) -> dict:
         paper = ctx.db.execute(select(Paper).where(Paper.id == pid)).scalar_one()
         fulltext = pdf_ingest.extract_text(paper.pdf_path, max_chars=40000)
         body = fulltext if fulltext else paper.abstract
-        prompt = (
-            "Summarize this paper: core contribution, method, experimental findings, "
-            "how it differs from prior work, and takeaways for researchers. "
-            "Markdown, under 300 words.\n\n"
-            f"Title: {paper.title}\n\n{wrap_external(body)}"
-        )
+        if state.get("source") == "news":
+            prompt = (
+                "Summarize this news item for a busy reader: what happened, why it matters, "
+                "the key numbers/quotes, and what to watch next. Markdown, under 200 words.\n\n"
+                f"Headline: {paper.title}\nSource: {paper.authors}\n\n{wrap_external(body)}"
+            )
+        else:
+            prompt = (
+                "Summarize this paper: core contribution, method, experimental findings, "
+                "how it differs from prior work, and takeaways for researchers. "
+                "Markdown, under 300 words.\n\n"
+                f"Title: {paper.title}\n\n{wrap_external(body)}"
+            )
         result = llm.complete(ctx.db, prompt, tier=policy.TIER_FRONTIER, task=ctx.task,
                               step="summarize", max_tokens=1500)
         ctx.db.add(Summary(paper_id=pid, model=result.model, content_md=result.text,
