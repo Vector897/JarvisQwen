@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /** 公开落地页（无需登录）：隐私声明置顶 → 宣言 → 使命 → 作者与仓库。
  *  独立暗色画布（nav/topbar 在 /home 不渲染），风格与 Logo 一致。 */
@@ -24,10 +24,13 @@ const ZEN: [string, string][] = [
 export default function Home() {
   const [code, setCode] = useState("");
   const [needCode, setNeedCode] = useState(false);
+  const codeInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // api.ts 在访问码网关 401 时跳回 /home?code=required——高亮输入框并说明原因
-    setNeedCode(new URLSearchParams(window.location.search).get("code") === "required");
+    // api.ts 在访问码网关 401 时跳回 /home?code=required——高亮输入框、说明原因并聚焦
+    const need = new URLSearchParams(window.location.search).get("code") === "required";
+    setNeedCode(need);
+    if (need) codeInput.current?.focus();
   }, []);
 
   function enterWithCode(e: React.FormEvent) {
@@ -77,7 +80,7 @@ export default function Home() {
               </p>
             )}
             <div className="flex w-full gap-2">
-              <input value={code} onChange={(e) => setCode(e.target.value)}
+              <input ref={codeInput} value={code} onChange={(e) => setCode(e.target.value)}
                 placeholder="Access code · 访问码 (jq-…)"
                 className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-sky-500" />
               <button type="submit"
@@ -86,7 +89,9 @@ export default function Home() {
               </button>
             </div>
             <p className="text-[11px] text-slate-600">
-              Got a magic link (…?k=code)? Just open it — no need to type anything here.
+              Received a full invite link ending in <span className="font-mono">?k=…</span>?
+              Open that link directly — it signs you in automatically, nothing to type here.
+              · 如果你收到的是结尾带 <span className="font-mono">?k=…</span> 的完整链接，直接打开它即可自动进入，无需在此输入。
             </p>
           </form>
         </div>
