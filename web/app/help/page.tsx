@@ -1,33 +1,38 @@
 "use client";
 
+import Link from "next/link";
 import { useLang } from "@/lib/i18n";
 
-/** 帮助页：讲清 JarvisQwen 如何运作、有哪些防呆机制、名词解释、故障排查。
- *  中英双语内联对照，默认英文（评委/国际用户），语言开关切换。 */
+/** 帮助页（技术参考）：任务流水线、成本架构、防呆机制、名词速查、疑难排查。
+ *  产品定位/上手流程/各页面作用在「使用指南」（/guidelines），本页不重复。
+ *  中英双语内联对照，语言开关切换。 */
 
 export default function Help() {
   const { lang } = useLang();
   const L = (en: string, zh: string) => (lang === "zh" ? zh : en);
   return (
     <div className="space-y-6 leading-relaxed">
-      <section className="card space-y-2">
-        <h2 className="text-lg font-bold">{L("What is JarvisQwen", "JarvisQwen 是什么")}</h2>
+      {/* 页头：定位说明 + 指向使用指南 */}
+      <section className="card space-y-1">
+        <h2 className="text-lg font-bold">{L("Technical reference", "技术参考文档")}</h2>
         <p className="text-sm text-slate-600">
           {L(
-            "JarvisQwen is an autonomous control plane for long-running knowledge workflows: a 24/7 scheduler daemon on a cheap (even free) CPU VM that commands the Qwen model family on Qwen Cloud (qwen3.6-flash / qwen3.7-plus / qwen3.7-max). The flagship workflow ships in this build: tracking, archiving, summarizing and briefing research literature. BYOK also supports other providers.",
-            "JarvisQwen 是长周期知识工作流的自主控制平面：一个跑在便宜（甚至免费）CPU 云主机上的 7×24 调度守护进程，指挥 Qwen Cloud 上的模型全家桶（qwen3.6-flash / qwen3.7-plus / qwen3.7-max）。本版本内置的旗舰工作流是学术文献的跟踪、归档、总结与简报。BYOK 也支持接入其他厂商模型。"
+            "This page explains how JarvisQwen works under the hood: the task pipeline, the cost architecture, and the safety mechanisms. If you are new here, start with the ",
+            "本页面向想了解实现原理的读者：任务流水线、成本架构与安全机制。如果你是第一次使用，请先阅读"
           )}
-        </p>
-        <p className="text-sm text-slate-600">
+          <Link href="/guidelines" className="font-medium underline hover:text-slate-800">
+            {L("Guidelines page", "「使用指南」")}
+          </Link>
           {L(
-            "The core idea: a cheap, always-on steward + expensive, on-demand experts. Polling, dedup and archiving are plain code at $0; the LLM is only invoked when something genuinely needs to be understood or written. Your laptop can stay off — the system keeps working in the cloud.",
-            "核心思路是「便宜常驻的管家 + 昂贵按需的专家」：轮询、去重、归档这些机械活由本地代码完成（0 费用），只有真正需要「读懂」和「总结」时才调用大模型。你的电脑可以关机，系统在云端持续工作。"
+            " — it covers what the product does, how to get started, and what each page is for.",
+            "——那里介绍产品定位、上手流程与各页面的作用，本页不再重复。"
           )}
         </p>
       </section>
 
+      {/* ① 任务流水线 */}
       <section className="space-y-2">
-        <h2 className="text-lg font-bold">{L("How data flows (the life of one task)", "数据怎么流动（一条任务的一生）")}</h2>
+        <h2 className="text-lg font-bold">{L("1. The task pipeline (the life of one task)", "一、任务流水线（一条任务的一生）")}</h2>
         <div className="card">
           <Flow steps={[
             [L("📡 Poll", "📡 轮询"), L("Fetch new papers from arXiv on schedule (pure code, $0)", "定时抓取 arXiv 新论文（纯代码，0 费用）")],
@@ -47,8 +52,15 @@ export default function Help() {
         </div>
       </section>
 
+      {/* ② 成本架构 */}
       <section className="space-y-2">
-        <h2 className="text-lg font-bold">{L("Three-tier model routing (the money saver)", "三级模型路由（省钱的核心）")}</h2>
+        <h2 className="text-lg font-bold">{L("2. Cost architecture: three-tier model routing", "二、成本架构：三级模型路由")}</h2>
+        <p className="text-sm text-slate-600">
+          {L(
+            "The core idea: a cheap, always-on steward + expensive, on-demand experts. The scheduler daemon runs on a cheap (even free) CPU VM and commands the Qwen model family on Qwen Cloud (qwen3.6-flash / qwen3.7-plus / qwen3.7-max); BYOK also supports other providers. Every piece of work is routed to the cheapest tier that can handle it:",
+            "核心思路是「便宜常驻的管家 + 昂贵按需的专家」：调度守护进程跑在便宜（甚至免费）的 CPU 云主机上，指挥 Qwen Cloud 上的模型全家桶（qwen3.6-flash / qwen3.7-plus / qwen3.7-max），BYOK 也支持接入其他厂商。每项工作都被路由到能胜任的最便宜一层："
+          )}
+        </p>
         <div className="grid gap-3 md:grid-cols-3">
           <Tier color="border-slate-300" name={L("Rule tier", "规则层")} cost={L("$0", "0 费用")}
             desc={L("Polling, dedup, archiving, parsing — pure Python, no model calls at all.", "轮询、去重、归档、格式解析——纯 Python 代码，不调用任何模型。")} />
@@ -59,8 +71,9 @@ export default function Help() {
         </div>
       </section>
 
+      {/* ③ 防呆机制 */}
       <section className="space-y-2">
-        <h2 className="text-lg font-bold">{L("🛡️ Safety rails (no runaway bills, no data loss, no rogue actions)", "🛡️ 防呆机制（不会烧钱、不会丢数据、不会失控）")}</h2>
+        <h2 className="text-lg font-bold">{L("3. 🛡️ Safety rails (no runaway bills, no data loss, no rogue actions)", "三、🛡️ 防呆机制（不会烧钱、不会丢数据、不会失控）")}</h2>
         <div className="space-y-2">
           <Guard title={L("Dry-run mode: no key, no errors", "Dry-run 模式：没配 Key 也不报错")}
             body={L(
@@ -115,8 +128,9 @@ export default function Help() {
         </div>
       </section>
 
+      {/* ④ 名词速查 */}
       <section className="space-y-2">
-        <h2 className="text-lg font-bold">{L("Glossary", "名词速查")}</h2>
+        <h2 className="text-lg font-bold">{L("4. Glossary", "四、名词速查")}</h2>
         <div className="card grid gap-2 text-sm md:grid-cols-2">
           <Term t={L("Control / execution plane", "控制平面 / 执行平面")}
             d={L("Control plane = the cheap always-on scheduler; execution plane = expensive on-demand LLMs. The former commands the latter.", "控制平面=便宜常驻的调度器；执行平面=昂贵按需的大模型。前者管后者。")} />
@@ -130,32 +144,29 @@ export default function Help() {
             d={L("Estimated completion time from historical per-step durations, corrected live as the task runs.", "按历史各步耗时估算的预计完成时间，会随执行动态修正。")} />
           <Term t="dry-run"
             d={L("Keyless simulation mode — the full pipeline at zero cost.", "无 Key 时的模拟运行模式，零费用跑通全流程。")} />
+          <Term t="BYOK"
+            d={L("Bring Your Own Key — you supply the API key, so usage is billed to your own provider account.", "Bring Your Own Key——自带 API Key，费用直接计入你自己的厂商账户。")} />
+          <Term t={L("Semantic cache", "语义缓存")}
+            d={L("Reuses answers to semantically identical requests, so repeated questions don't trigger paid calls.", "语义相同的请求复用历史结果，重复提问不再触发付费调用。")} />
         </div>
       </section>
 
+      {/* ⑤ 疑难排查 */}
       <section className="space-y-2">
-        <h2 className="text-lg font-bold">{L("First-run in three steps", "首次使用三步")}</h2>
-        <ol className="card list-decimal space-y-1 pl-6 text-sm text-slate-600">
-          <li>{L("Paste an API key in Settings (Qwen Cloud recommended — free quota on sign-up); it's validated on save.", "设置页粘贴一个 API Key（推荐 Qwen Cloud，注册即有免费额度），保存时会自动校验。")}</li>
-          <li>{L("Fill in \"My research focus\" and set a daily budget cap in Settings.", "设置页填写「我的研究方向」并设置每日预算上限。")}</li>
-          <li>{L("Add research keywords in Subscriptions, or just type a task in natural language on the Tasks page.", "订阅页添加研究关键词，或直接在任务页用自然语言下一个任务。")}</li>
-        </ol>
-      </section>
-
-      <section className="space-y-2">
-        <h2 className="text-lg font-bold">{L("FAQ", "常见问题")}</h2>
+        <h2 className="text-lg font-bold">{L("5. Troubleshooting", "五、疑难排查")}</h2>
         <div className="space-y-2">
-          <Faq q={L("Tasks keep returning simulated responses / spending nothing?", "任务一直显示模拟响应 / 不花钱？")}
-            a={L("No API key is configured (dry-run mode). Paste a key in Settings to switch to real models.", "说明还没配 API Key（dry-run 模式）。去设置页粘贴一个 Key 即可切换到真实模型。")} />
-          <Faq q={L("Key configured but real calls fail?", "配了 Key 但真实调用报错？")}
+          <Faq q={L("An API key is configured, but real model calls fail with an error?", "已配置 API Key，但真实模型调用报错？")}
             a={L("Self-hosted backends need the litellm dependency: run pip install litellm on the server. The Docker image ships with it preinstalled.", "自托管后端需要安装 litellm 依赖：在服务器运行 pip install litellm。Docker 镜像已内置，无需手动装。")} />
-          <Faq q={L("A task failed — now what?", "任务失败了怎么办？")}
-            a={L("Open the task detail and hit \"Rerun from checkpoint\" — it continues from the last successful step without redoing completed work.", "打开任务详情，点「从检查点重跑」——会从最后成功的一步继续，不会重做已完成的部分。")} />
-          <Faq q={L("The connection dot in the top bar turned red?", "右上角连接圆点变红？")}
-            a={L("The live event stream disconnected (backend restart or network blip); the browser reconnects automatically. Page data can still be refreshed manually.", "表示实时事件流断开（后端重启或网络波动），浏览器会自动重连；页面数据仍可手动刷新获取。")} />
-          <Faq q={L("How do I control spending?", "怎么控制花费？")}
-            a={L("Set a daily budget cap in Settings, enable the semantic cache, and leave simple tasks to the light tier. The dashboard shows today's spend in real time.", "设置页设「每日预算上限」，开启「语义缓存」，把简单任务留给轻量层模型。仪表盘可实时看今日花费进度。")} />
+          <Faq q={L("Tasks stay QUEUED and never start running?", "任务一直停在 QUEUED 状态不开始执行？")}
+            a={L("Usually the daily budget breaker has tripped (check the Dashboard) or all workers are busy with long tasks. Raise the cap in Settings or wait for a worker to free up; suspended tasks resume automatically.", "通常是日预算已熔断（看仪表盘）或全部 worker 正被长任务占用。到设置页调高预算上限，或等 worker 空闲；被挂起的任务会自动恢复。")} />
+          <Faq q={L("Where are my data and the admin password stored?", "我的数据和管理员密码存放在哪里？")}
+            a={L("Everything lives in the data/ directory next to the deployment (SQLite database, PDFs, admin_password.txt). Back up that one directory and you have backed up everything.", "全部数据都在部署目录旁的 data/ 目录里（SQLite 数据库、PDF、admin_password.txt）。备份这一个目录就等于备份了一切。")} />
         </div>
+        <p className="text-xs text-slate-400">
+          {L("For usage-level questions (where results are, what the flow diagram means, how to control spending), see the FAQ in the ", "使用层面的问题（结果在哪里查看、流程图的含义、如何控制花费）请见")}
+          <Link href="/guidelines" className="underline hover:text-slate-600">{L("Guidelines", "「使用指南」")}</Link>
+          {L(".", "中的常见问题。")}
+        </p>
       </section>
     </div>
   );
