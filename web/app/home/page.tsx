@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 /** 公开落地页（无需登录）：隐私声明置顶 → 宣言 → 使命 → 作者与仓库。
  *  独立暗色画布（nav/topbar 在 /home 不渲染），风格与 Logo 一致。 */
@@ -21,6 +22,22 @@ const ZEN: [string, string][] = [
 ];
 
 export default function Home() {
+  const [code, setCode] = useState("");
+  const [needCode, setNeedCode] = useState(false);
+
+  useEffect(() => {
+    // api.ts 在访问码网关 401 时跳回 /home?code=required——高亮输入框并说明原因
+    setNeedCode(new URLSearchParams(window.location.search).get("code") === "required");
+  }, []);
+
+  function enterWithCode(e: React.FormEvent) {
+    e.preventDefault();
+    const k = code.trim();
+    if (!k) return;
+    // 走 middleware 的魔法链接逻辑：?k= 写入 aaos_access cookie 后跳到干净的 /dashboard
+    window.location.href = `/dashboard?k=${encodeURIComponent(k)}`;
+  }
+
   return (
     <div className="mx-auto max-w-3xl">
       <div className="overflow-hidden rounded-3xl bg-[#05070d] text-slate-200 shadow-2xl ring-1 ring-slate-800">
@@ -47,6 +64,31 @@ export default function Home() {
               ⭐ GitHub
             </a>
           </div>
+
+          {/* 访问码入口：公网 demo 的 /api 全部要求访问码；没走 ?k= 魔法链接的
+              访客点 Quick Try 会被 401 弹回到这里（?code=required 高亮提示） */}
+          <form onSubmit={enterWithCode}
+            className={`mt-5 flex w-full max-w-md flex-col items-center gap-2 rounded-2xl border p-4 transition
+              ${needCode ? "border-amber-500/70 bg-amber-950/30" : "border-slate-800 bg-slate-900/40"}`}>
+            {needCode && (
+              <p className="text-xs font-semibold text-amber-400">
+                This demo requires an access code — paste the one you were given. ·
+                该演示需要访问码，请粘贴你收到的访问码
+              </p>
+            )}
+            <div className="flex w-full gap-2">
+              <input value={code} onChange={(e) => setCode(e.target.value)}
+                placeholder="Access code · 访问码 (jq-…)"
+                className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-sky-500" />
+              <button type="submit"
+                className="shrink-0 rounded-xl bg-slate-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500">
+                Enter →
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-600">
+              Got a magic link (…?k=code)? Just open it — no need to type anything here.
+            </p>
+          </form>
         </div>
 
         {/* 隐私声明——放在最前面 */}

@@ -9,12 +9,15 @@ export async function api<T = any>(
     credentials: "include",
     ...options,
   });
-  if (res.status === 401 && typeof window !== "undefined" && !path.includes("/auth/")) {
-    window.location.href = "/home";
-    throw new Error("Not signed in");
-  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
+    if (res.status === 401 && typeof window !== "undefined" && !path.includes("/auth/")) {
+      // 区分两种 401：访问码网关拦截 → 跳回首页并提示输码；普通未登录 → 跳回首页。
+      // 此前两者都静默弹回，没拿到 ?k= 魔法链接的访客点 Quick Try 会莫名其妙被弹出。
+      const needCode = String(body.detail || "").includes("Access code");
+      window.location.href = needCode ? "/home?code=required" : "/home";
+      throw new Error(body.detail || "Not signed in");
+    }
     throw new Error(body.detail || `Request failed (${res.status})`);
   }
   return res.json();
