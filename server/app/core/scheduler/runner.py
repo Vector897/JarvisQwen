@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 import traceback
@@ -15,12 +16,14 @@ from ..engine.engine import run_task
 from ..settings_store import get_setting
 
 LEASE_SECONDS = 30 * 60  # 单任务租约上限（看门狗依据）
+WORKERS = int(os.environ.get("AAOS_WORKERS", "3"))  # 并发工作线程数：任务多为 LLM 网络等待，多线程可并行
 _stop = threading.Event()
+_claim_lock = threading.Lock()  # 多 worker 同进程，用线程锁保证"查询+写租约"原子，防双消费
 
 
 def _claim_next() -> str | None:
     """领取一个排队任务（写租约），返回 task_id。"""
-    with session() as db:
+    with _claim_lock, session() as db:
         task = db.execute(
             select(Task).where(Task.status == "QUEUED")
             .order_by(Task.priority, Task.created_at).limit(1)
@@ -112,11 +115,14 @@ def recover_on_boot() -> None:
             t.status = "QUEUED"
 
 
-def start(scheduler) -> threading.Thread:
-    """启动工作线程并注册 APScheduler 定时作业。scheduler: BackgroundScheduler。"""
+def start(scheduler) -> list[threading.Thread]:
+    """启动工作线程池并注册 APScheduler 定时作业。scheduler: BackgroundScheduler。"""
     recover_on_boot()
-    thread = threading.Thread(target=worker_loop, name="aaos-worker", daemon=True)
-    thread.start()
+    threads = []
+    for i in range(WORKERS):
+        thread = threading.Thread(target=worker_loop, name=f"aaos-worker-{i}", daemon=True)
+        thread.start()
+        threads.append(thread)
 
     with session() as db:
         briefing_hour = int(get_setting(db, "briefing_hour"))
@@ -127,7 +133,7 @@ def start(scheduler) -> threading.Thread:
     scheduler.add_job(poll_commands, "interval", seconds=20, id="telegram_remote")
     scheduler.add_job(nightly_consolidate, "cron", hour=consolidate_hour, id="consolidate")
     scheduler.add_job(daily_briefing, "cron", hour=briefing_hour, minute=30, id="briefing")
-    return thread
+    return threads
 
 
 def stop() -> None:
