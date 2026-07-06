@@ -111,7 +111,7 @@ export default function TaskDetail() {
       <h2 className="text-lg font-semibold">{t("taskDetail.artifacts")}</h2>
       <div className="space-y-2">
         {task.artifacts.map((a: any, i: number) => (
-          <details key={i} className="card">
+          <details key={i} className="card" open>
             <summary className="cursor-pointer text-sm font-medium">
               {a.name} <span className="text-xs text-slate-400">· {a.step} · {fmtTime(a.ts)}</span>
             </summary>
