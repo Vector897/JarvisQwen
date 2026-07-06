@@ -26,18 +26,46 @@ def fingerprint(title: str, arxiv_id: str) -> str:
     return hashlib.sha256(f"{arxiv_id}|{title.lower().strip()}".encode()).hexdigest()[:32]
 
 
+def _route_source(ctx: TaskContext, query: str) -> str:
+    """判定查询该走 'arxiv' 还是 'news'。
+
+    优先用轻量层 LLM 分类——关键词允许列表判不准非学术查询（名人/产品名会误入
+    arXiv：如 "Taylor Swift" 会命中泰勒展开类论文）。dry-run（无 Key，返回 simulated）
+    或分类失败时回退到启发式 is_news_query。分类结果走语义缓存，重复查询 0 成本。"""
+    prompt = (
+        "Classify this search query as exactly one word — 'academic' or 'news'.\n"
+        "academic = scholarly research: papers, science, math, algorithms, ML/AI methods.\n"
+        "news = people, companies, products, markets, politics, entertainment, current events.\n"
+        f"Query: {query}\nAnswer:"
+    )
+    try:
+        result = llm.complete(ctx.db, prompt, tier=policy.TIER_LIGHT, task=ctx.task,
+                              step="route", max_tokens=8)
+        if not result.simulated:
+            ans = result.text.strip().lower()
+            if "news" in ans:
+                return "news"
+            if "academic" in ans or "arxiv" in ans:
+                return "arxiv"
+    except Exception:  # noqa: BLE001  分类失败不阻断，落到启发式
+        pass
+    return "news" if news.is_news_query(query) else "arxiv"
+
+
 def step_fetch(ctx: TaskContext, state: dict) -> dict:
-    """抓取候选条目。学术话题走 arXiv；股票/财经/时事等非学术话题走新闻源；
-    arXiv 无结果时也自动回退到新闻，保证"任意查询都有结果"。"""
+    """抓取候选条目。LLM 判定学术/新闻后走对应源；所选源为空时反向兜底，
+    保证"任意查询都有结果"且不会把名人/产品查询错配成无关论文。"""
     params = state["params"]
     query = params.get("query", "LLM agents")
     n = int(params.get("max_results", 15))
-    if news.is_news_query(query):
-        found, source = news.search(query, n), "news"
+    source = _route_source(ctx, query)
+    if source == "news":
+        found = news.search(query, n)
+        if not found:  # 新闻空 → 反向退学术
+            found, source = arxiv.search(query, n), "arxiv"
     else:
         found = arxiv.search(query, n)
-        source = "arxiv"
-        if not found:  # 冷门/非英文话题 arXiv 常空 → 退回新闻
+        if not found:  # 学术空 → 退回新闻
             found, source = news.search(query, n), "news"
     state["found"] = found
     state["source"] = source
