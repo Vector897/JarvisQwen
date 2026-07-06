@@ -71,6 +71,10 @@ def apply_template(template_id: str, values: dict) -> tuple[str, dict, str]:
         raise ValueError(f"Unknown template: {template_id}")
     params = {}
     for f in tpl["fields"]:
-        params[f["key"]] = values.get(f["key"], f.get("default", ""))
+        val = values.get(f["key"], f.get("default", ""))
+        if f["type"] == "text" and not str(val).strip():
+            # 无默认值的文本字段必填：空 query 会让 arXiv API 直接报错、任务必败
+            raise ValueError(f"Field '{f['label']}' is required")
+        params[f["key"]] = val
     title = f"{tpl['name']}: {params.get('query', '')}".strip(": ")[:60]
     return tpl["task_type"], params, title

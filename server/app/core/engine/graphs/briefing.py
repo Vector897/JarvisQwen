@@ -49,9 +49,11 @@ def step_compose(ctx: TaskContext, state: dict) -> dict:
 def step_save(ctx: TaskContext, state: dict) -> dict:
     date = time.strftime("%Y-%m-%d")
     ctx.db.add(Briefing(date=date, content_md=state["briefing_md"], owner_id=ctx.task.owner_id))
+    ctx.artifact("Briefing", state["briefing_md"][:2000])
+    ctx.db.commit()  # 先落库并释放写锁，再做外部推送——Telegram+SMTP 最长 ~30s，
+    #                  期间若持有写锁会堵死全站 POST（settings SELECT 会 autoflush 脏对象）
     bus.publish("briefing_ready", {"date": date, "task_id": ctx.task.id})
     notify_all(ctx.db, f"JarvisQwen briefing {date}", state["briefing_md"][:3500])
-    ctx.artifact("Briefing", state["briefing_md"][:2000])
     return state
 
 

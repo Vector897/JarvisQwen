@@ -41,6 +41,7 @@ def check(db: Session, task: Task | None = None, upcoming_estimate: float = 0.01
         if get_setting(db, "notify_on_budget_cutoff") and _last_cutoff_notified_date != today:
             _last_cutoff_notified_date = today
             from ...connectors.notify import notify_all
+            db.commit()  # 释放写锁再做外部推送（Telegram/SMTP 网络调用期间不得持锁）
             notify_all(db, "JarvisQwen budget cutoff", f"Today's spend reached ${spent:.2f}/${daily_limit:.2f}. Tasks suspended until tomorrow or a higher cap.")
         raise BudgetExceeded(f"Daily budget exhausted (${spent:.2f}/${daily_limit:.2f})")
     if spent >= 0.8 * daily_limit:
