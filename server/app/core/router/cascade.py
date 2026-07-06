@@ -8,9 +8,6 @@ from __future__ import annotations
 
 import re
 
-from sqlalchemy.orm import Session
-
-from ...models import Task
 from . import llm, policy
 
 HEDGE_PATTERNS = re.compile(
@@ -35,16 +32,15 @@ def _confidence_heuristic(text: str, min_len: int = 20) -> float:
 
 
 def complete_cascade(
-    db: Session,
     prompt: str,
     *,
-    task: Task | None = None,
+    task_id: str = "",
     step: str = "",
     max_tokens: int = 2048,
     confidence_threshold: float = 0.6,
 ) -> tuple[llm.LlmResult, bool]:
     """先用轻量层回答；置信度不足则升级前沿层重做。返回 (结果, 是否发生了升级)。"""
-    light_result = llm.complete(db, prompt, tier=policy.TIER_LIGHT, task=task,
+    light_result = llm.complete(prompt, tier=policy.TIER_LIGHT, task_id=task_id,
                                 step=f"{step}_light", max_tokens=max_tokens)
     if light_result.cached or light_result.simulated:
         return light_result, False  # 缓存命中/dry-run 不参与级联判断
@@ -53,6 +49,6 @@ def complete_cascade(
     if confidence >= confidence_threshold:
         return light_result, False
 
-    frontier_result = llm.complete(db, prompt, tier=policy.TIER_FRONTIER, task=task,
+    frontier_result = llm.complete(prompt, tier=policy.TIER_FRONTIER, task_id=task_id,
                                    step=f"{step}_escalated", max_tokens=max_tokens)
     return frontier_result, True

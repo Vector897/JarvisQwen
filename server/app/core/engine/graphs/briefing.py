@@ -1,4 +1,7 @@
-"""晨间简报图：聚合近 24h 总结 → 轻量层撰写 → 入库推送。"""
+"""晨间简报图：聚合近 24h 总结 → 轻量层撰写 → 入库推送。
+
+会话纪律：DB 读写在短会话内；LLM 撰写与外部推送（Telegram/SMTP）在会话外。
+"""
 from __future__ import annotations
 
 import time
@@ -14,14 +17,15 @@ from ..engine import StepDef, TaskContext, register
 
 def step_gather(ctx: TaskContext, state: dict) -> dict:
     cutoff = time.time() - 86400
-    rows = ctx.db.execute(
-        select(Summary, Paper).join(Paper, Summary.paper_id == Paper.id)
-        .where(Summary.created_at >= cutoff, Paper.owner_id == ctx.task.owner_id)
-        .order_by(Summary.created_at.desc())
-    ).all()
-    state["items"] = [
-        {"title": p.title, "url": p.url, "summary": s.content_md[:1200]} for s, p in rows
-    ]
+    with ctx.session() as db:
+        rows = db.execute(
+            select(Summary, Paper).join(Paper, Summary.paper_id == Paper.id)
+            .where(Summary.created_at >= cutoff, Paper.owner_id == ctx.task.owner_id)
+            .order_by(Summary.created_at.desc())
+        ).all()
+        state["items"] = [
+            {"title": p.title, "url": p.url, "summary": s.content_md[:1200]} for s, p in rows
+        ]
     ctx.artifact("Source material", f"{len(state['items'])} summaries from the last 24h")
     return state
 
@@ -38,8 +42,8 @@ def step_compose(ctx: TaskContext, state: dict) -> dict:
         "each paper give 2-3 sentences of highlights plus one line on why it's worth reading. "
         "Concise, information-dense, no filler.\n\n" + material
     )
-    result = llm.complete(ctx.db, prompt, tier=policy.TIER_LIGHT, task=ctx.task,
-                          step="compose", max_tokens=2000)
+    result = llm.complete(prompt, tier=policy.TIER_LIGHT, task_id=ctx.task.id,
+                          step="compose", max_tokens=2000)  # 网络，无会话
     # 简报末尾附原文链接（本地拼接，0 token）
     links = "\n".join(f"- [{it['title']}]({it['url']})" for it in items)
     state["briefing_md"] = result.text + "\n\n## Links\n" + links
@@ -48,12 +52,12 @@ def step_compose(ctx: TaskContext, state: dict) -> dict:
 
 def step_save(ctx: TaskContext, state: dict) -> dict:
     date = time.strftime("%Y-%m-%d")
-    ctx.db.add(Briefing(date=date, content_md=state["briefing_md"], owner_id=ctx.task.owner_id))
+    with ctx.session() as db:
+        db.add(Briefing(date=date, content_md=state["briefing_md"], owner_id=ctx.task.owner_id))
     ctx.artifact("Briefing", state["briefing_md"][:2000])
-    ctx.db.commit()  # 先落库并释放写锁，再做外部推送——Telegram+SMTP 最长 ~30s，
-    #                  期间若持有写锁会堵死全站 POST（settings SELECT 会 autoflush 脏对象）
+    # 会话已提交关闭，再做外部推送（Telegram+SMTP 最长 ~30s，期间不得持有会话/写锁）
     bus.publish("briefing_ready", {"date": date, "task_id": ctx.task.id})
-    notify_all(ctx.db, f"JarvisQwen briefing {date}", state["briefing_md"][:3500])
+    notify_all(f"JarvisQwen briefing {date}", state["briefing_md"][:3500])
     return state
 
 

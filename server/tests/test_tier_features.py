@@ -70,6 +70,5 @@ def test_memory_arbitration_reconciles_conflict():
         uid = user.id
 
     # consolidate 依赖 LLM 调用（dry-run 无 Key 时返回模拟响应），只验证不抛异常、流程可跑通
-    with session() as db:
-        count = consolidate(db, uid)
-        assert count >= 0  # dry-run 下情节记忆不足 3 条会提前返回 0，属预期
+    count = consolidate(uid)  # 自管短会话，LLM 调用在会话外
+    assert count >= 0  # dry-run 下情节记忆不足 3 条会提前返回 0，属预期

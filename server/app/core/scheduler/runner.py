@@ -46,9 +46,7 @@ def worker_loop() -> None:
             _stop.wait(2)
             continue
         try:
-            with session() as db:
-                task = db.execute(select(Task).where(Task.id == task_id)).scalar_one()
-                run_task(db, task)
+            run_task(task_id)  # 引擎自管短会话；执行期间（含网络调用）不持有 DB 锁
         except Exception:  # noqa: BLE001  引擎内部已兜底，这里防调度器线程死亡
             traceback.print_exc()
             with session() as db:
@@ -91,11 +89,13 @@ def nightly_consolidate() -> None:
     from ..memory.memory import consolidate, decay_heat
 
     with session() as db:
-        for user in db.execute(select(User)).scalars().all():
-            try:
-                consolidate(db, user.id)
-            except Exception:  # noqa: BLE001
-                traceback.print_exc()
+        user_ids = [u.id for u in db.execute(select(User)).scalars().all()]
+    for user_id in user_ids:  # consolidate 内含 LLM 调用，自管短会话，不在此持有会话
+        try:
+            consolidate(user_id)
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
+    with session() as db:
         decay_heat(db)
         evict_expired(db)
 
