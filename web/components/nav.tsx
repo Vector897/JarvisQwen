@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useLang } from "@/lib/i18n";
 
 const items = [
+  ["/guidelines", "📖", "nav.guidelines"],
   ["/dashboard", "📊", "nav.dashboard"],
   ["/tasks", "🔁", "nav.tasks"],
   ["/subscriptions", "📡", "nav.subscriptions"],
@@ -40,16 +41,12 @@ export default function Nav() {
       </nav>
       {/* 移动端底栏（高频入口） */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex justify-around border-t border-slate-200 bg-white py-2 dark:border-slate-800 dark:bg-slate-900 md:hidden">
-        {items.slice(0, 4).map(([href, icon, key]) => (
+        {items.slice(0, 5).map(([href, icon, key]) => (
           <Link key={href} href={href}
             className={`flex flex-col items-center text-xs ${pathname.startsWith(href) ? "text-slate-900 dark:text-white font-bold" : "text-slate-400"}`}>
             <span className="text-lg">{icon}</span>{t(key)}
           </Link>
         ))}
-        <Link href="/help"
-          className={`flex flex-col items-center text-xs ${pathname.startsWith("/help") ? "text-slate-900 dark:text-white font-bold" : "text-slate-400"}`}>
-          <span className="text-lg">❓</span>{t("nav.help")}
-        </Link>
       </nav>
     </>
   );

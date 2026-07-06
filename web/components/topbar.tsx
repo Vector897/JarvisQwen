@@ -9,7 +9,7 @@ const TITLES: Record<string, [string, string]> = {
   "/dashboard": ["仪表盘", "Dashboard"], "/tasks": ["任务", "Tasks"],
   "/subscriptions": ["订阅", "Subscriptions"], "/library": ["知识库", "Library"],
   "/briefings": ["简报", "Briefings"], "/approvals": ["审批", "Approvals"],
-  "/audit": ["审计", "Audit"], "/settings": ["设置", "Settings"], "/help": ["帮助", "Help"],
+  "/audit": ["审计", "Audit"], "/settings": ["设置", "Settings"], "/help": ["帮助", "Help"], "/guidelines": ["使用指南", "Guidelines"],
   "/connect": ["手机遥控", "Connect"], "/deploy": ["一键部署", "Deploy"],
 };
 

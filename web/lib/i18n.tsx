@@ -6,14 +6,14 @@ import { createContext, useContext, useEffect, useState } from "react";
  * 轻量 i18n：覆盖全部界面文案（导航、按钮、标题、空状态、表单标签、Toast 提示）。
  * 范围边界：后端返回的动态内容本身——任务标题、审计摘要、简报正文、AI 回答——
  * 是模型生成的中文语义内容，不在此翻译范围（那是数据，不是界面文案）。
- * 帮助页（/help）是长文档说明，保留中文原文，切换英文时顶部会有提示条。
+ * 使用指南页（/help）为长文档，采用页内 L(en, zh) 双语对照，不走本字典。
  */
 
 const DICT = {
   zh: {
     "nav.dashboard": "仪表盘", "nav.tasks": "任务", "nav.subscriptions": "订阅",
     "nav.library": "知识库", "nav.briefings": "简报", "nav.approvals": "审批",
-    "nav.audit": "审计", "nav.settings": "设置", "nav.help": "帮助",
+    "nav.audit": "审计", "nav.settings": "设置", "nav.help": "帮助", "nav.guidelines": "使用指南",
     "nav.connect": "手机遥控", "nav.deploy": "一键部署",
     "topbar.logout": "登出", "topbar.online": "实时连接正常", "topbar.offline": "连接断开，重连中…",
     "topbar.admin": "管理员",
@@ -115,12 +115,11 @@ const DICT = {
     "login.title": "登录 JarvisQwen", "login.hint": "首次部署的初始密码在服务器 data/admin_password.txt",
     "login.username": "用户名", "login.password": "密码", "login.submit": "登录",
 
-    "help.langNotice": "帮助页目前仅提供中文说明文档，界面切换不影响本页内容。",
   },
   en: {
     "nav.dashboard": "Dashboard", "nav.tasks": "Tasks", "nav.subscriptions": "Subscriptions",
     "nav.library": "Library", "nav.briefings": "Briefings", "nav.approvals": "Approvals",
-    "nav.audit": "Audit", "nav.settings": "Settings", "nav.help": "Help",
+    "nav.audit": "Audit", "nav.settings": "Settings", "nav.help": "Help", "nav.guidelines": "Guidelines",
     "nav.connect": "Connect", "nav.deploy": "Deploy",
     "topbar.logout": "Log out", "topbar.online": "Live", "topbar.offline": "Reconnecting…",
     "topbar.admin": "Admin",
@@ -222,7 +221,6 @@ const DICT = {
     "login.title": "Sign in to JarvisQwen", "login.hint": "The initial password is in data/admin_password.txt on the server",
     "login.username": "Username", "login.password": "Password", "login.submit": "Sign in",
 
-    "help.langNotice": "The Help page is currently Chinese-only documentation; the language toggle doesn't affect this content.",
   },
 } as const;
 
