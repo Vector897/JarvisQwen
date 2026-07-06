@@ -49,6 +49,11 @@ class TaskContext:
     db: Session
     task: Task
     state: dict = field(default_factory=dict)
+    # 步内进度插值基准（由引擎在每步开始时写入）：整体进度 = base + span*本步完成比例
+    _prog_base: float = 0.0        # 本步开始时的整体进度（0..1）
+    _prog_span: float = 0.0        # 本步在整体中占的进度份额（0..1）
+    _prog_step_dur: float = 0.0    # 本步预估耗时（秒），用于步内 ETA 递减
+    _prog_after: float = 0.0       # 本步之后所有步骤的预估耗时之和（秒）
 
     def artifact(self, name: str, content: str) -> None:
         """产出一个验证伪影（清单/摘要/文件列表），流水线视图可见。"""
@@ -56,6 +61,19 @@ class TaskContext:
             {"step": self.state.get("_current_step", ""), "name": name,
              "content": content[:8000], "ts": time.time()}
         )
+
+    def report_progress(self, fraction: float, **extra) -> None:
+        """步骤内部报告完成比例（0..1），驱动进度条在长步骤（如逐篇总结）内平滑前进。
+
+        长步骤若不上报，进度条会在其整个执行期间冻结；这里按插值基准算出整体进度
+        并持久化（短提交释放写锁），前端列表页直接用事件、详情页重拉时读到最新值。"""
+        fraction = max(0.0, min(1.0, fraction))
+        overall = round(self._prog_base + self._prog_span * fraction, 4)
+        self.task.progress = overall
+        self.task.eta_ts = time.time() + (1.0 - fraction) * self._prog_step_dur + self._prog_after
+        self.db.commit()  # 落库并释放写锁；符合"网络调用之间不持锁"约定
+        bus.publish("task_progress", {"task_id": self.task.id, "progress": overall,
+                                      "eta_ts": self.task.eta_ts, **extra})
 
     def publish(self, **data) -> None:
         bus.publish("task_progress", {"task_id": self.task.id, **data})
@@ -104,13 +122,19 @@ def step_durations(db: Session, task_type: str, steps: list[StepDef]) -> list[fl
     return out
 
 
-def _update_progress(db: Session, task: Task, steps: list[StepDef], next_index: int) -> None:
+def _update_progress(db: Session, task: Task, steps: list[StepDef], next_index: int,
+                     ctx: "TaskContext | None" = None) -> None:
     durations = step_durations(db, task.type, steps)
     total = sum(durations) or 1.0
     done = sum(durations[:next_index])
     task.progress = round(done / total, 4)
     remaining = sum(durations[next_index:])
     task.eta_ts = time.time() + remaining if next_index < len(steps) else 0
+    if ctx is not None and next_index < len(steps):  # 记录步内进度插值基准
+        ctx._prog_base = task.progress
+        ctx._prog_span = durations[next_index] / total
+        ctx._prog_step_dur = durations[next_index]
+        ctx._prog_after = sum(durations[next_index + 1:])
     bus.publish("task_progress", {
         "task_id": task.id, "status": task.status, "progress": task.progress,
         "eta_ts": task.eta_ts, "step_index": next_index, "total_steps": len(steps),
@@ -148,7 +172,7 @@ def run_task(db: Session, task: Task) -> None:
     for i in range(start_index, len(steps)):
         step = steps[i]
         state["_current_step"] = step.name
-        _update_progress(db, task, steps, i)
+        _update_progress(db, task, steps, i, ctx)  # 同时记录步内进度插值基准
         db.commit()  # 进度先落库：①不留脏数据给步内 autoflush 拿锁 ②进度条对 API 即时可见
         t0 = time.time()
         try:

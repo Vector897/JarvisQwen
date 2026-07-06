@@ -151,10 +151,10 @@ def step_summarize(ctx: TaskContext, state: dict) -> dict:
         ctx.db.add(Summary(paper_id=pid, model=result.model, content_md=result.text,
                            cost_usd=result.cost_usd))
         done.append(pid)
-        ctx.db.commit()  # 逐篇提交：本步会跑多次 120s LLM 调用，若不提交则写锁横跨整步，
-        #                 API POST 全被锁死；提交后每篇总结即时落库、下一篇调用期间不占锁。
-        bus.publish("task_progress", {"task_id": ctx.task.id,
-                                      "sub_progress": f"Summarizing {idx + 1}/{len(ids)}"})
+        # 逐篇上报步内进度：这是唯一足够长的步骤（多次 ~120s 调用），不上报进度条会冻结。
+        # report_progress 内部 commit——同时完成"逐篇提交释放写锁"，两个目的合一。
+        ctx.report_progress((idx + 1) / len(ids),
+                            sub_progress=f"Summarizing {idx + 1}/{len(ids)}")
     ctx.artifact("Summaries done", f"Summarized {len(done)} papers")
     return state
 

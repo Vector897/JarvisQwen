@@ -75,7 +75,7 @@ export default function TaskDetail() {
           </span>
         </div>
         <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-          <div className="h-full bg-blue-500 transition-all"
+          <div className="h-full bg-blue-500 transition-all duration-700 ease-out"
             style={{ width: `${Math.round((task.progress || 0) * 100)}%` }} />
         </div>
       </div>
