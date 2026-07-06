@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..auth import current_user
+from ..auth import require_admin
 from ..core.router import providers
 from ..db import get_db
 from ..models import ApiKey, User
@@ -23,7 +23,7 @@ class KeyIn(BaseModel):
 
 
 @router.post("")
-def add_key(body: KeyIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def add_key(body: KeyIn, user: User = Depends(require_admin), db: Session = Depends(get_db)):
     key = providers.normalize_key(body.raw_key)
     if not key or len(key) < 10:
         raise HTTPException(400, "Key is empty or too short - check what you pasted")
@@ -49,7 +49,7 @@ def add_key(body: KeyIn, user: User = Depends(current_user), db: Session = Depen
 
 
 @router.get("")
-def list_keys(user: User = Depends(current_user), db: Session = Depends(get_db)):
+def list_keys(user: User = Depends(require_admin), db: Session = Depends(get_db)):
     rows = db.execute(select(ApiKey).order_by(ApiKey.provider, ApiKey.priority)).scalars().all()
     return [{
         "id": r.id, "provider": r.provider, "label": r.label, "base_url": r.base_url,
@@ -58,7 +58,7 @@ def list_keys(user: User = Depends(current_user), db: Session = Depends(get_db))
 
 
 @router.delete("/{key_id}")
-def delete_key(key_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def delete_key(key_id: str, user: User = Depends(require_admin), db: Session = Depends(get_db)):
     row = db.execute(select(ApiKey).where(ApiKey.id == key_id)).scalar_one_or_none()
     if not row:
         raise HTTPException(404, "Key not found")
@@ -69,7 +69,7 @@ def delete_key(key_id: str, user: User = Depends(current_user), db: Session = De
 
 
 @router.post("/{key_id}/probe")
-def reprobe(key_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def reprobe(key_id: str, user: User = Depends(require_admin), db: Session = Depends(get_db)):
     row = db.execute(select(ApiKey).where(ApiKey.id == key_id)).scalar_one_or_none()
     if not row:
         raise HTTPException(404, "Key not found")

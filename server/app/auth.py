@@ -60,7 +60,21 @@ def parse_session_token(token: str) -> str | None:
 
 
 def _default_user(db: Session) -> User | None:
-    """单用户本地模式：无需登录，回退到默认本地账户（首启创建的 admin）。"""
+    """免登录回退。本地单机模式（无访问码）回退到 admin，保持零配置体验；
+    公网演示模式（设置了访问码）回退到受限的 demo member——过访问码闸门
+    只代表"可以体验"，不代表拥有管理权限（改预算/模型/Key/用户须登录 admin）。"""
+    if config.access_code:
+        demo = db.execute(select(User).where(User.name == "demo")).scalar_one_or_none()
+        if demo is None:
+            try:
+                demo = User(name="demo", role="member",
+                            password_hash=hash_password(secrets.token_urlsafe(24)))
+                db.add(demo)
+                db.flush()
+            except Exception:  # noqa: BLE001  并发首访撞 name 唯一约束 → 取已建的
+                db.rollback()
+                demo = db.execute(select(User).where(User.name == "demo")).scalar_one_or_none()
+        return demo
     user = db.execute(select(User).where(User.name == "admin")).scalar_one_or_none()
     if user:
         return user
