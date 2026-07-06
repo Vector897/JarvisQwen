@@ -96,8 +96,12 @@ def briefings(limit: int = 14, user: User = Depends(current_user), db: Session =
 # ---------- 审批（HITL）----------
 @router.get("/approvals")
 def approvals(user: User = Depends(current_user), db: Session = Depends(get_db)):
-    rows = db.execute(select(Approval).where(Approval.status == "pending")
-                      .order_by(Approval.created_at.desc())).scalars().all()
+    # 只列出自己任务的待审批项（admin 看全部）：审批决定会重启任务，不能跨用户操作
+    q = (select(Approval).join(Task, Approval.task_id == Task.id)
+         .where(Approval.status == "pending").order_by(Approval.created_at.desc()))
+    if user.role != "admin":
+        q = q.where(Task.owner_id == user.id)
+    rows = db.execute(q).scalars().all()
     return [{"id": a.id, "task_id": a.task_id, "action_desc": a.action_desc,
              "risk_level": a.risk_level, "created_at": a.created_at} for a in rows]
 
@@ -110,9 +114,11 @@ def decide(approval_id: str, decision: str,
     a = db.execute(select(Approval).where(Approval.id == approval_id)).scalar_one_or_none()
     if not a or a.status != "pending":
         raise HTTPException(404, "Approval item not found or already handled")
+    task = db.execute(select(Task).where(Task.id == a.task_id)).scalar_one_or_none()
+    if user.role != "admin" and (task is None or task.owner_id != user.id):
+        raise HTTPException(403, "Cannot decide on another user's approval")
     a.status = "approved" if decision == "approve" else "rejected"
     a.decided_by = user.id
-    task = db.execute(select(Task).where(Task.id == a.task_id)).scalar_one_or_none()
     if task and task.status == "WAITING_APPROVAL":
         task.status = "QUEUED"  # 从检查点无缝继续（拒绝的情况由 require_approval 抛 TaskFailed）
     return {"ok": True, "status": a.status}
@@ -124,7 +130,16 @@ def audit(task_id: str = "", limit: int = 100,
           user: User = Depends(current_user), db: Session = Depends(get_db)):
     q = select(AuditLog).order_by(AuditLog.ts.desc()).limit(limit)
     if task_id:
+        # 指定任务：非 admin 需拥有该任务，否则不返回其审计（prompt/输出摘要属敏感）
+        if user.role != "admin":
+            owned = db.execute(select(Task.id).where(
+                Task.id == task_id, Task.owner_id == user.id)).first()
+            if owned is None:
+                raise HTTPException(403, "Not allowed to view this task's audit log")
         q = q.where(AuditLog.task_id == task_id)
+    elif user.role != "admin":
+        # 未指定任务：非 admin 只能看自己任务产生的审计（系统级 task_id="" 记录仅 admin 可见）
+        q = q.where(AuditLog.task_id.in_(select(Task.id).where(Task.owner_id == user.id)))
     return [{"id": r.id, "task_id": r.task_id, "step": r.step, "model": r.model,
              "tokens_in": r.tokens_in, "tokens_out": r.tokens_out,
              "cost_usd": round(r.cost_usd, 6), "cached": bool(r.cached),
