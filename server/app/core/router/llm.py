@@ -107,6 +107,9 @@ def complete(
         return LlmResult(text=fake, model="(simulated)", cost_usd=0, simulated=True)
 
     # ④⑤ 路由 + 弹性调用（退避/断路器/fallback 链）
+    # 先 commit：把进度/缓存计数等 autoflush 产生的脏写落库并释放 SQLite 写锁，
+    # 否则写锁会被持有横跨整个（最长 120s 的）网络调用，堵死全站 POST。
+    db.commit()
     chain = policy.models_for_tier(db, tier)
     retries = int(get_setting(db, "max_retries"))
 

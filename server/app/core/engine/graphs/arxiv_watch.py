@@ -100,6 +100,11 @@ def step_ingest(ctx: TaskContext, state: dict) -> dict:
     """下载 PDF 并入库（纯代码，0 token）。"""
     stored_ids = []
     for p in state["selected"]:
+        # 逐篇提交后崩溃重跑的幂等兜底：该指纹已入库则复用，不重复下载/插入
+        prev = ctx.db.execute(select(Paper).where(Paper.dedup_fingerprint == p["fingerprint"])).scalar_one_or_none()
+        if prev is not None:
+            stored_ids.append(prev.id)
+            continue
         pdf_path = pdf_ingest.download_pdf(p.get("pdf_url", ""), p["arxiv_id"])
         paper = Paper(
             arxiv_id=p["arxiv_id"], title=p["title"], authors=p["authors"],
@@ -107,7 +112,7 @@ def step_ingest(ctx: TaskContext, state: dict) -> dict:
             pdf_path=pdf_path, dedup_fingerprint=p["fingerprint"], owner_id=ctx.task.owner_id,
         )
         ctx.db.add(paper)
-        ctx.db.flush()
+        ctx.db.commit()  # 逐篇提交而非 flush：flush 拿到的写锁会横跨下一篇的 PDF 下载（网络）
         stored_ids.append(paper.id)
     state["paper_ids"] = stored_ids
     ctx.artifact("Archive manifest", f"Archived {len(stored_ids)} papers (PDF + metadata)")

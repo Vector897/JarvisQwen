@@ -149,6 +149,7 @@ def run_task(db: Session, task: Task) -> None:
         step = steps[i]
         state["_current_step"] = step.name
         _update_progress(db, task, steps, i)
+        db.commit()  # 进度先落库：①不留脏数据给步内 autoflush 拿锁 ②进度条对 API 即时可见
         t0 = time.time()
         try:
             new_state = step.fn(ctx, state)
