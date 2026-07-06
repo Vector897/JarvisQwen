@@ -121,6 +121,10 @@ def step_summarize(ctx: TaskContext, state: dict) -> dict:
     for idx, pid in enumerate(ids):
         if pid in done:
             continue
+        # 上次运行已总结并提交过 → 幂等跳过，不重复付费（逐篇提交后崩溃重跑的兜底）。
+        if ctx.db.execute(select(Summary).where(Summary.paper_id == pid)).first():
+            done.append(pid)
+            continue
         paper = ctx.db.execute(select(Paper).where(Paper.id == pid)).scalar_one()
         fulltext = pdf_ingest.extract_text(paper.pdf_path, max_chars=40000)
         body = fulltext if fulltext else paper.abstract
@@ -142,6 +146,8 @@ def step_summarize(ctx: TaskContext, state: dict) -> dict:
         ctx.db.add(Summary(paper_id=pid, model=result.model, content_md=result.text,
                            cost_usd=result.cost_usd))
         done.append(pid)
+        ctx.db.commit()  # 逐篇提交：本步会跑多次 120s LLM 调用，若不提交则写锁横跨整步，
+        #                 API POST 全被锁死；提交后每篇总结即时落库、下一篇调用期间不占锁。
         bus.publish("task_progress", {"task_id": ctx.task.id,
                                       "sub_progress": f"Summarizing {idx + 1}/{len(ids)}"})
     ctx.artifact("Summaries done", f"Summarized {len(done)} papers")

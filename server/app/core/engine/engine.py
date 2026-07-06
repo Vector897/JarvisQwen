@@ -185,6 +185,8 @@ def run_task(db: Session, task: Task) -> None:
 
         _record_duration(db, task.type, step.name, time.time() - t0)
         _save_checkpoint(db, task, i, state)
+        db.commit()  # 每步提交：释放 SQLite 写锁，让下一步的 LLM/网络调用期间不占锁；
+        #             同时让 artifacts/审计/检查点对 API 读连接（WAL 快照）即时可见。
 
     task.status = "DONE"
     task.progress = 1.0
