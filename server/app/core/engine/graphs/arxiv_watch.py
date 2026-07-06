@@ -1,6 +1,9 @@
 """学术工作流主图：轮询 → 去重 → 初筛 → 下载归档 → 逐篇总结 → 写记忆。
 
 对应架构文档 3.7 学术工作流。params: {"query": "...", "max_results": 15}
+
+会话纪律：每步只在纯 DB 操作段开短会话（with ctx.session()），
+LLM 调用与 PDF 下载等网络 I/O 一律在会话之外执行。
 """
 from __future__ import annotations
 
@@ -28,7 +31,7 @@ def fingerprint(title: str, arxiv_id: str) -> str:
 
 def step_fetch(ctx: TaskContext, state: dict) -> dict:
     """抓取候选条目。学术话题走 arXiv；股票/财经/时事等非学术话题走新闻源；
-    arXiv 无结果时也自动回退到新闻，保证"任意查询都有结果"。"""
+    arXiv 无结果时也自动回退到新闻，保证"任意查询都有结果"。纯网络，无会话。"""
     params = state["params"]
     query = params.get("query", "LLM agents")
     n = int(params.get("max_results", 15))
@@ -49,12 +52,13 @@ def step_fetch(ctx: TaskContext, state: dict) -> dict:
 
 def step_dedupe(ctx: TaskContext, state: dict) -> dict:
     fresh = []
-    for p in state["found"]:
-        fp = fingerprint(p["title"], p["arxiv_id"])
-        exists = ctx.db.execute(select(Paper).where(Paper.dedup_fingerprint == fp)).first()
-        if not exists:
-            p["fingerprint"] = fp
-            fresh.append(p)
+    with ctx.session() as db:
+        for p in state["found"]:
+            fp = fingerprint(p["title"], p["arxiv_id"])
+            exists = db.execute(select(Paper).where(Paper.dedup_fingerprint == fp)).first()
+            if not exists:
+                p["fingerprint"] = fp
+                fresh.append(p)
     state["fresh"] = fresh
     ctx.artifact("Dedupe result", f"{len(fresh)} new / {len(state['found'])} fetched")
     return state
@@ -67,17 +71,18 @@ def step_filter(ctx: TaskContext, state: dict) -> dict:
         state["selected"] = []
         return state
     # 新闻按"查询词"判相关（命中查询的文章都相关）；论文按用户研究画像判相关。
-    if state.get("source") == "news":
-        profile = state["params"].get("query", "") or str(get_setting(ctx.db, "research_profile"))
-    else:
-        profile = str(get_setting(ctx.db, "research_profile")) or state["params"].get("query", "")
+    with ctx.session() as db:
+        if state.get("source") == "news":
+            profile = state["params"].get("query", "") or str(get_setting(db, "research_profile"))
+        else:
+            profile = str(get_setting(db, "research_profile")) or state["params"].get("query", "")
+        threshold = float(get_setting(db, "relevance_threshold"))
     listing = "\n".join(f"{i}. {p['title']} — {p['abstract'][:300]}" for i, p in enumerate(fresh))
     prompt = (
         f"My research focus: {profile}\n\nBelow are candidate papers. Score each for relevance (0-1). "
         f'Output ONLY a JSON array like [{{"i":0,"score":0.8}}]:\n\n{wrap_external(listing)}'
     )
-    result = llm.complete(ctx.db, prompt, tier=policy.TIER_LIGHT, task=ctx.task, step="filter", max_tokens=1024)
-    threshold = float(get_setting(ctx.db, "relevance_threshold"))
+    result = llm.complete(prompt, tier=policy.TIER_LIGHT, task_id=ctx.task.id, step="filter", max_tokens=1024)
     scores: dict[int, float] = {}
     try:
         text = result.text
@@ -97,23 +102,26 @@ def step_filter(ctx: TaskContext, state: dict) -> dict:
 
 
 def step_ingest(ctx: TaskContext, state: dict) -> dict:
-    """下载 PDF 并入库（纯代码，0 token）。"""
+    """下载 PDF 并入库（0 token）。下载在会话外，逐篇短会话入库。"""
     stored_ids = []
     for p in state["selected"]:
-        # 逐篇提交后崩溃重跑的幂等兜底：该指纹已入库则复用，不重复下载/插入
-        prev = ctx.db.execute(select(Paper).where(Paper.dedup_fingerprint == p["fingerprint"])).scalar_one_or_none()
-        if prev is not None:
-            stored_ids.append(prev.id)
+        # 崩溃重跑的幂等兜底：该指纹已入库则复用，不重复下载/插入
+        with ctx.session() as db:
+            prev = db.execute(select(Paper).where(Paper.dedup_fingerprint == p["fingerprint"])).scalar_one_or_none()
+            prev_id = prev.id if prev is not None else None
+        if prev_id is not None:
+            stored_ids.append(prev_id)
             continue
-        pdf_path = pdf_ingest.download_pdf(p.get("pdf_url", ""), p["arxiv_id"])
-        paper = Paper(
-            arxiv_id=p["arxiv_id"], title=p["title"], authors=p["authors"],
-            abstract=p["abstract"], published_at=p["published_at"], url=p["url"],
-            pdf_path=pdf_path, dedup_fingerprint=p["fingerprint"], owner_id=ctx.task.owner_id,
-        )
-        ctx.db.add(paper)
-        ctx.db.commit()  # 逐篇提交而非 flush：flush 拿到的写锁会横跨下一篇的 PDF 下载（网络）
-        stored_ids.append(paper.id)
+        pdf_path = pdf_ingest.download_pdf(p.get("pdf_url", ""), p["arxiv_id"])  # 网络，无会话
+        with ctx.session() as db:
+            paper = Paper(
+                arxiv_id=p["arxiv_id"], title=p["title"], authors=p["authors"],
+                abstract=p["abstract"], published_at=p["published_at"], url=p["url"],
+                pdf_path=pdf_path, dedup_fingerprint=p["fingerprint"], owner_id=ctx.task.owner_id,
+            )
+            db.add(paper)
+            db.flush()
+            stored_ids.append(paper.id)
     state["paper_ids"] = stored_ids
     ctx.artifact("Archive manifest", f"Archived {len(stored_ids)} papers (PDF + metadata)")
     return state
@@ -126,11 +134,12 @@ def step_summarize(ctx: TaskContext, state: dict) -> dict:
     for idx, pid in enumerate(ids):
         if pid in done:
             continue
-        # 上次运行已总结并提交过 → 幂等跳过，不重复付费（逐篇提交后崩溃重跑的兜底）。
-        if ctx.db.execute(select(Summary).where(Summary.paper_id == pid)).first():
-            done.append(pid)
-            continue
-        paper = ctx.db.execute(select(Paper).where(Paper.id == pid)).scalar_one()
+        with ctx.session() as db:
+            # 已有总结（崩溃重跑）→ 幂等跳过，不重复付费
+            if db.execute(select(Summary).where(Summary.paper_id == pid)).first():
+                done.append(pid)
+                continue
+            paper = db.execute(select(Paper).where(Paper.id == pid)).scalar_one()
         fulltext = pdf_ingest.extract_text(paper.pdf_path, max_chars=40000)
         body = fulltext if fulltext else paper.abstract
         if state.get("source") == "news":
@@ -146,13 +155,12 @@ def step_summarize(ctx: TaskContext, state: dict) -> dict:
                 "Markdown, under 300 words.\n\n"
                 f"Title: {paper.title}\n\n{wrap_external(body)}"
             )
-        result = llm.complete(ctx.db, prompt, tier=policy.TIER_FRONTIER, task=ctx.task,
-                              step="summarize", max_tokens=1500)
-        ctx.db.add(Summary(paper_id=pid, model=result.model, content_md=result.text,
+        result = llm.complete(prompt, tier=policy.TIER_FRONTIER, task_id=ctx.task.id,
+                              step="summarize", max_tokens=1500)  # 网络，无会话
+        with ctx.session() as db:
+            db.add(Summary(paper_id=pid, model=result.model, content_md=result.text,
                            cost_usd=result.cost_usd))
         done.append(pid)
-        ctx.db.commit()  # 逐篇提交：本步会跑多次 120s LLM 调用，若不提交则写锁横跨整步，
-        #                 API POST 全被锁死；提交后每篇总结即时落库、下一篇调用期间不占锁。
         bus.publish("task_progress", {"task_id": ctx.task.id,
                                       "sub_progress": f"Summarizing {idx + 1}/{len(ids)}"})
     ctx.artifact("Summaries done", f"Summarized {len(done)} papers")
@@ -162,10 +170,11 @@ def step_summarize(ctx: TaskContext, state: dict) -> dict:
 def step_memorize(ctx: TaskContext, state: dict) -> dict:
     n = len(state.get("summarized", []))
     q = state["params"].get("query", "")
-    memory.write_episodic(ctx.db, ctx.task.owner_id,
-                          f"Ran literature watch '{q}': fetched {len(state.get('found', []))}, "
-                          f"{len(state.get('fresh', []))} new, summarized {n}.",
-                          tags=f"arxiv_watch,{q}")
+    with ctx.session() as db:
+        memory.write_episodic(db, ctx.task.owner_id,
+                              f"Ran literature watch '{q}': fetched {len(state.get('found', []))}, "
+                              f"{len(state.get('fresh', []))} new, summarized {n}.",
+                              tags=f"arxiv_watch,{q}")
     return state
 
 

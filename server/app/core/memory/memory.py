@@ -10,6 +10,7 @@ import time
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ...db import session
 from ...models import Memory
 from ..router import llm, policy
 
@@ -59,50 +60,62 @@ def _find_conflict(db: Session, owner_id: str, new_fact: str) -> Memory | None:
     return None
 
 
-def _arbitrate(db: Session, old: Memory, new_fact: str) -> str:
-    """时序仲裁：生成保留历史连续性的调和摘要，而非硬覆盖。"""
+def _arbitrate(old_content: str, new_fact: str) -> str:
+    """时序仲裁：生成保留历史连续性的调和摘要，而非硬覆盖。纯网络，无会话。"""
     prompt = (
         "Below are two records on the same topic from different points in time; they may conflict. "
         "Write ONE sentence that reconciles them with explicit time sense "
         "(e.g. 'X was A before T1, updated to B since'):"
-        f"\nOld record: {old.content}\nNew record: {new_fact}"
+        f"\nOld record: {old_content}\nNew record: {new_fact}"
     )
-    result = llm.complete(db, prompt, tier=policy.TIER_LIGHT, step="memory_arbitrate", max_tokens=200)
-    return result.text.strip() or f"{old.content} (updated: {new_fact})"
+    result = llm.complete(prompt, tier=policy.TIER_LIGHT, step="memory_arbitrate", max_tokens=200)
+    return result.text.strip() or f"{old_content} (updated: {new_fact})"
 
 
-def consolidate(db: Session, owner_id: str) -> int:
-    """夜间整合：把近 24h 情节记忆交给轻量层提炼为语义记忆；冲突时时序仲裁而非硬覆盖。"""
+def consolidate(owner_id: str) -> int:
+    """夜间整合：把近 24h 情节记忆交给轻量层提炼为语义记忆；冲突时时序仲裁而非硬覆盖。
+
+    自管短会话：读情节 → LLM 提炼（无会话）→ 逐条短会话查冲突/写入，
+    仲裁的 LLM 调用同样在会话外。
+    """
     cutoff = time.time() - 86400
-    episodes = db.execute(
-        select(Memory).where(
-            Memory.kind == "episodic", Memory.owner_id == owner_id,
-            Memory.ts >= cutoff, Memory.archived == 0,
-        )
-    ).scalars().all()
+    with session() as db:
+        episodes = [e.content[:500] for e in db.execute(
+            select(Memory).where(
+                Memory.kind == "episodic", Memory.owner_id == owner_id,
+                Memory.ts >= cutoff, Memory.archived == 0,
+            )
+        ).scalars().all()]
     if len(episodes) < 3:
         return 0
-    joined = "\n---\n".join(e.content[:500] for e in episodes[:40])
+    joined = "\n---\n".join(episodes[:40])
     prompt = (
         "Below are work-log fragments from a research-assistant system over the past 24 hours. "
         "Extract 1-5 facts or patterns worth remembering long-term (topics the user cares "
         "about, recurring themes, explicit preferences). One per line, conclusions only:\n\n" + joined
     )
-    result = llm.complete(db, prompt, tier=policy.TIER_LIGHT, step="memory_consolidate", max_tokens=512)
+    result = llm.complete(prompt, tier=policy.TIER_LIGHT, step="memory_consolidate", max_tokens=512)
     count = 0
     for line in result.text.splitlines():
         fact = line.strip().lstrip("0123456789.、- ")
         if len(fact) < 8:
             continue
-        conflict = _find_conflict(db, owner_id, fact)
-        if conflict is not None:
-            reconciled = _arbitrate(db, conflict, fact)
-            conflict.content = reconciled
-            conflict.confidence = min(1.0, conflict.confidence + 0.1)
-            conflict.ts = time.time()
-            conflict.tags = (conflict.tags + ",reconciled").strip(",")
+        with session() as db:
+            conflict = _find_conflict(db, owner_id, fact)
+            conflict_id = conflict.id if conflict is not None else None
+            conflict_content = conflict.content if conflict is not None else ""
+        if conflict_id is not None:
+            reconciled = _arbitrate(conflict_content, fact)  # 网络，无会话
+            with session() as db:
+                row = db.execute(select(Memory).where(Memory.id == conflict_id)).scalar_one_or_none()
+                if row is not None:
+                    row.content = reconciled
+                    row.confidence = min(1.0, row.confidence + 0.1)
+                    row.ts = time.time()
+                    row.tags = (row.tags + ",reconciled").strip(",")
         else:
-            db.add(Memory(kind="semantic", content=fact, tags="consolidated", owner_id=owner_id))
+            with session() as db:
+                db.add(Memory(kind="semantic", content=fact, tags="consolidated", owner_id=owner_id))
         count += 1
     return count
 

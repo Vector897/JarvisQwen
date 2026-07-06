@@ -114,15 +114,58 @@ def test_engine_checkpoint_resume():
         task = Task(type="_test", owner_id=user.id, params_json="{}")
         db.add(task)
         db.flush()
-        run_task(db, task)
-        assert task.status == "FAILED"
-        cp = latest_checkpoint(db, task.id)
-        assert cp is not None and cp.step_name == "s1"  # s1 的成果被保住
+        task_id = task.id
 
-        task.status = "QUEUED"
-        run_task(db, task)
-        assert task.status == "DONE"
+    run_task(task_id)  # 引擎自管会话，只需 task_id
+    with session() as db:
+        assert db.get(Task, task_id).status == "FAILED"
+        cp = latest_checkpoint(db, task_id)
+        assert cp is not None and cp.step_name == "s1"  # s1 的成果被保住
+        db.get(Task, task_id).status = "QUEUED"
+
+    run_task(task_id)
+    with session() as db:
+        assert db.get(Task, task_id).status == "DONE"
     assert executed == ["s1", "s2", "s2"]  # 重跑没有重复执行 s1
+
+
+# ---------- 会话纪律：步骤网络等待期间不得阻塞其他写者 ----------
+def test_writes_not_blocked_while_step_waits_on_network():
+    """本项目曾因 worker 跨网络调用持有 SQLite 写锁而全站 POST 瘫痪。
+    此测试守卫会话纪律：步骤在"网络等待"（会话外耗时操作）期间，
+    其他线程的写操作必须立即完成，而不是等到任务结束。"""
+    import threading
+    import time as _t
+
+    from app.core.engine.engine import StepDef, register, run_task
+    from app.db import init_db, session
+    from app.models import Task, User
+
+    init_db()
+
+    def slow_network(ctx, state):
+        _t.sleep(2.0)  # 模拟 LLM/PDF 下载等网络等待（正确写法：不持有会话）
+        return state
+
+    register("_locktest", [StepDef("net", slow_network)])
+    with session() as db:
+        user = User(name="lock_user", password_hash="x")
+        db.add(user)
+        db.flush()
+        task = Task(type="_locktest", owner_id=user.id, params_json="{}")
+        db.add(task)
+        db.flush()
+        task_id, owner_id = task.id, user.id
+
+    worker = threading.Thread(target=run_task, args=(task_id,))
+    worker.start()
+    _t.sleep(0.5)  # 等 worker 进入 slow_network 的等待段
+    t0 = _t.time()
+    with session() as db:  # 模拟 API 线程的 POST 写入
+        db.add(Task(type="_locktest", owner_id=owner_id, params_json="{}", status="CANCELLED"))
+    blocked_for = _t.time() - t0
+    worker.join()
+    assert blocked_for < 1.0, f"并发写被阻塞 {blocked_for:.2f}s——步骤执行期间不应持有写锁"
 
 
 # ---------- 预算熔断 ----------

@@ -165,7 +165,7 @@ def telegram_bot_info(user: User = Depends(current_user), db: Session = Depends(
 
 @router.post("/settings/test-notify")
 def test_notify(user: User = Depends(require_admin), db: Session = Depends(get_db)):
-    results = notify_all(db, "JarvisQwen test push", "If you can read this, push notifications are configured correctly ✅")
+    results = notify_all("JarvisQwen test push", "If you can read this, push notifications are configured correctly ✅")
     if not results:
         raise HTTPException(400, "No push channel enabled")
     return {"results": results}
@@ -258,7 +258,7 @@ def library_qa(body: QaIn, user: User = Depends(current_user), db: Session = Dep
         f"Cite sources as [number]; do not invent anything not present in the evidence.\n\n"
         f"Question: {body.question}\n\nEvidence:\n{evidence}"
     )
-    result, escalated = cascade.complete_cascade(db, prompt, step="library_qa", max_tokens=1200)
+    result, escalated = cascade.complete_cascade(prompt, step="library_qa", max_tokens=1200)
     return {"answer": result.text, "escalated": escalated,
             "cited": [{"id": p.id, "title": p.title, "url": p.url} for _, p, _ in top]}
 
