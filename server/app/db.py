@@ -21,7 +21,7 @@ def engine():
         )
 
         @event.listens_for(_engine, "connect")
-        def _set_wal(dbapi_conn, _record):  # WAL: 调度线程与 API 线程并发读写
+        def _set_wal(dbapi_conn, _record):  # WAL: concurrent reads/writes from the scheduler thread and API threads
             cur = dbapi_conn.cursor()
             cur.execute("PRAGMA journal_mode=WAL")
             cur.execute("PRAGMA busy_timeout=30000")
@@ -47,12 +47,12 @@ def session() -> Iterator[Session]:
 
 
 def get_db() -> Iterator[Session]:
-    """FastAPI 依赖项。"""
+    """FastAPI dependency."""
     with session() as s:
         yield s
 
 
 def init_db() -> None:
-    from . import models  # noqa: F401  确保模型已注册
+    from . import models  # noqa: F401  ensure the models are registered
 
     models.Base.metadata.create_all(engine())

@@ -1,8 +1,9 @@
-"""新闻检索（Google News RSS，免费、无需 Key、覆盖任意话题）。
+"""News retrieval (Google News RSS: free, no key required, covers any topic).
 
-让非学术查询（股票/财经/时事/政治等 arXiv 没有的主题）也能进入同一条
-fetch→dedupe→triage→summarize→brief 管道。返回条目与 arxiv 连接器同构
-（无 PDF：pdf_url 留空，管道会自动改用 abstract 作为总结素材）。
+Lets non-academic queries (stocks/finance/current-affairs/politics and other topics
+arXiv doesn't cover) flow into the same fetch→dedupe→triage→summarize→brief pipeline.
+Returned items are structurally identical to the arxiv connector (no PDF: pdf_url is
+left empty, and the pipeline automatically falls back to the abstract as summary material).
 """
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ RSS = "https://news.google.com/rss/search"
 _TAG = re.compile(r"<[^>]+>")
 _CJK = re.compile(r"[一-鿿぀-ヿ가-힯]")
 
-# 更适合走新闻源（而非 arXiv 学术库）的信号词
+# Signal words indicating the query fits a news source (rather than the arXiv academic library)
 _NEWS_SIGNALS = (
     "stock", "shares", "share price", "price target", "market", "earnings", "ipo",
     "merger", "acquisition", "acquire", "ceo", "revenue", "nasdaq", "dow", "s&p",
@@ -35,14 +36,14 @@ def _clean(s: str) -> str:
 
 
 def _locale(query: str) -> tuple[str, str, str]:
-    """CJK 查询走中文区新闻，其余走英文区。"""
+    """CJK queries route to the Chinese news region, everything else to the English region."""
     if _CJK.search(query):
         return "zh-CN", "CN", "CN:zh-Hans"
     return "en-US", "US", "US:en"
 
 
 def is_news_query(query: str) -> bool:
-    """判断该查询更适合新闻源。命中信号词或主体为 CJK 即视为新闻类。"""
+    """Decide whether the query fits a news source. Treated as news if it matches a signal word or is predominantly CJK."""
     q = query.lower()
     if any(sig in q for sig in _NEWS_SIGNALS):
         return True
@@ -53,15 +54,16 @@ def is_news_query(query: str) -> bool:
 
 
 def _bounded(fn, timeout: float, default):
-    """在守护线程里跑 fn，最多等 timeout 秒。超时/异常都返回 default，
-    绝不阻塞调用方（守护线程随进程退出，不会挂起 worker）。DNS 解析卡死
-    不受 httpx 超时管辖，这层兜底是必要的。"""
+    """Run fn in a daemon thread, waiting at most `timeout` seconds. Returns default on
+    timeout/exception, never blocking the caller (the daemon thread exits with the process
+    and won't hang the worker). A stuck DNS resolution is not governed by httpx timeouts,
+    so this safety net is necessary."""
     box = [default]
 
     def run() -> None:
         try:
             box[0] = fn()
-        except Exception:  # noqa: BLE001  网络/解析失败 → 保持 default
+        except Exception:  # noqa: BLE001  network/parse failure → keep default
             pass
 
     t = threading.Thread(target=run, daemon=True)
@@ -87,22 +89,22 @@ def _fetch(query: str, max_results: int) -> list[dict]:
         src_el = it.find("{*}source")
         source = (src_el.text if src_el is not None else "").strip()
         desc = _clean(it.findtext("description", ""))
-        if desc == title:  # Google News 的 description 常只是标题链接，去重复
+        if desc == title:  # Google News description is often just the title link, deduplicate
             desc = ""
         abstract = " ".join(x for x in (desc, f"Source: {source}." if source else "") if x)
         out.append({
             "arxiv_id": "",
             "title": title,
             "abstract": abstract or title,
-            "authors": source,               # 用来源当"作者"
+            "authors": source,               # use the source as the "author"
             "published_at": (it.findtext("pubDate", "") or "")[:16],
             "url": it.findtext("link", ""),
-            "pdf_url": "",                    # 新闻无 PDF
+            "pdf_url": "",                    # news items have no PDF
             "kind": "news",
         })
     return out
 
 
 def search(query: str, max_results: int = 15) -> list[dict]:
-    """检索新闻，最多耗时 15 秒；不可达/超时/解析失败均返回空列表，绝不阻塞管道。"""
+    """Retrieve news, taking at most 15 seconds; returns an empty list on unreachable/timeout/parse failure, never blocking the pipeline."""
     return _bounded(lambda: _fetch(query, max_results), timeout=15.0, default=[])

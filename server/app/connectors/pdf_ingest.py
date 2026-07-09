@@ -1,4 +1,4 @@
-"""PDF 下载与文本抽取（pymupdf 可选：未安装则只归档不抽取全文）。"""
+"""PDF download and text extraction (pymupdf optional: if not installed, only archive without extracting full text)."""
 from __future__ import annotations
 
 import re
@@ -9,7 +9,7 @@ from ..config import config
 
 
 def download_pdf(url: str, arxiv_id: str) -> str:
-    """下载 PDF 到归档目录，返回相对路径；失败返回空串（不阻断主流程）。"""
+    """Download the PDF to the archive directory and return its relative path; returns an empty string on failure (does not block the main flow)."""
     if not url:
         return ""
     safe_name = re.sub(r"[^\w.-]", "_", arxiv_id or url.rsplit("/", 1)[-1]) + ".pdf"

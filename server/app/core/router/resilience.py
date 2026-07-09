@@ -1,7 +1,7 @@
-"""弹性容错：带抖动的指数退避 + 断路器 + fallback 链编排。
+"""Resilience and fault tolerance: exponential backoff with jitter + circuit breaker + fallback chain orchestration.
 
-对应调研报告《断点续传与任务重跑》第三章：Exponential Backoff with Jitter、
-Circuit Breakers、多备份模型策略。
+Corresponds to Chapter 3 of the research report "Resumable Transfer and Task Rerun":
+Exponential Backoff with Jitter, Circuit Breakers, and multi-backup model strategies.
 """
 from __future__ import annotations
 
@@ -15,10 +15,10 @@ T = TypeVar("T")
 
 
 class CircuitBreaker:
-    """滑动窗口失败率断路器（每个 厂商/模型 一个实例）。
+    """Sliding-window failure-rate circuit breaker (one instance per provider/model).
 
-    closed（正常）→ 窗口内失败率超阈值 → open（熔断，直接拒绝）
-    → 冷却期后 half-open（放一个探测请求）→ 成功恢复 closed / 失败回到 open。
+    closed (normal) → failure rate within the window exceeds threshold → open (tripped, reject directly)
+    → after cooldown, half-open (let one probe request through) → success restores closed / failure returns to open.
     """
 
     def __init__(self, window: int = 10, threshold: float = 0.6, cooldown: float = 60.0) -> None:
@@ -35,7 +35,7 @@ class CircuitBreaker:
             if self.state == "open":
                 if time.time() - self.opened_at >= self.cooldown:
                     self.state = "half-open"
-                    return True  # 放一个探测请求
+                    return True  # let one probe request through
                 return False
             return True
 
@@ -73,7 +73,7 @@ class AllModelsFailed(Exception):
 
 
 def backoff_delays(retries: int, base: float = 1.0, cap: float = 30.0) -> list[float]:
-    """指数退避 + 全抖动：delay = random(0, min(cap, base*2^i))。"""
+    """Exponential backoff + full jitter: delay = random(0, min(cap, base*2^i))."""
     return [random.uniform(0, min(cap, base * (2**i))) for i in range(retries)]
 
 
@@ -83,13 +83,13 @@ def call_with_fallbacks(
     retries_per_model: int = 2,
     is_retryable: Callable[[Exception], bool] | None = None,
 ) -> tuple[str, T]:
-    """沿 fallback 链依次尝试各模型，每个模型内部做退避重试。返回 (成功的模型, 结果)。"""
+    """Try each model along the fallback chain in order, with backoff retries within each model. Returns (successful model, result)."""
     is_retryable = is_retryable or (lambda e: True)
     last_error: Exception | None = None
     for model in models:
         br = breaker_for(model)
         if not br.allow():
-            continue  # 熔断中，跳到下一个备份模型
+            continue  # tripped, skip to the next backup model
         delays = backoff_delays(retries_per_model)
         for attempt in range(retries_per_model + 1):
             try:
@@ -102,5 +102,5 @@ def call_with_fallbacks(
                 if attempt < retries_per_model and is_retryable(e):
                     time.sleep(delays[attempt])
                 else:
-                    break  # 不可重试或次数用尽 → 换下一个模型
+                    break  # not retryable or retries exhausted → move to the next model
     raise AllModelsFailed(f"All models failed; last error: {last_error}")

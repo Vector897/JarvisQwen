@@ -31,7 +31,7 @@ export default function Settings() {
   );
 }
 
-// ---------- API Key 管理（BYOK）----------
+// ---------- API key management (BYOK) ----------
 function KeysSection() {
   const [keys, setKeys] = useState<any[]>([]);
   const [raw, setRaw] = useState("");
@@ -118,7 +118,7 @@ function KeysSection() {
   );
 }
 
-// ---------- 业务设置 ----------
+// ---------- Business settings ----------
 function GeneralSection() {
   const [s, setS] = useState<any>(null);
   const toast = useToast();
@@ -218,7 +218,7 @@ function GeneralSection() {
   );
 }
 
-// ---------- 推送通知 ----------
+// ---------- Push notifications ----------
 function NotifySection() {
   const [s, setS] = useState<any>(null);
   const toast = useToast();
@@ -238,7 +238,7 @@ function NotifySection() {
         smtp_user: s.smtp_user, smtp_from: s.smtp_from, smtp_to: s.smtp_to,
         notify_on_budget_cutoff: !!s.notify_on_budget_cutoff,
       };
-      // 密钥字段：留空则不提交（后端也会兜底跳过空值，双重保险）
+      // Secret fields: if left blank, don't submit them (the backend also skips empty values as a fallback — belt and suspenders)
       if (s.telegram_bot_token) values.telegram_bot_token = s.telegram_bot_token;
       if (s.smtp_password) values.smtp_password = s.smtp_password;
       await put("/api/settings", { values });
@@ -308,7 +308,7 @@ function NotifySection() {
   );
 }
 
-// ---------- Zotero 同步 ----------
+// ---------- Zotero sync ----------
 function ZoteroSection() {
   const [s, setS] = useState<any>(null);
   const toast = useToast();
@@ -358,7 +358,7 @@ function ZoteroSection() {
   );
 }
 
-// ---------- 用户管理（管理员）----------
+// ---------- User management (admin) ----------
 function UsersSection() {
   const [users, setUsers] = useState<any[]>([]);
   const [name, setName] = useState("");
@@ -417,7 +417,7 @@ function UsersSection() {
   );
 }
 
-// ---------- 修改密码 ----------
+// ---------- Change password ----------
 function PasswordSection() {
   const [oldPw, setOldPw] = useState("");
   const [newPw, setNewPw] = useState("");

@@ -1,9 +1,9 @@
-"""Telegram 遥控：轮询 getUpdates，把授权 chat 发来的消息转成任务并回执。
+"""Telegram remote control: poll getUpdates, turn messages from the authorized chat into tasks and acknowledge them.
 
-- polling 而非 webhook：本地/内网部署零公网配置可用。
-- 安全：只处理 settings.telegram_chat_id 配置的那一个 chat 的消息；
-  其他人即使找到 bot 也无法指挥你的系统。
-- 失败静默：遥控不是关键路径，网络抖动不产生副作用（offset 未推进会自然重试）。
+- Polling rather than webhook: works with zero public-network configuration for local/intranet deployment.
+- Security: only processes messages from the single chat configured in settings.telegram_chat_id;
+  others cannot command your system even if they find the bot.
+- Silent failure: remote control is not on the critical path, and network jitter produces no side effects (an un-advanced offset naturally retries).
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ HELP_TEXT = (
 
 
 def bot_info(db: Session) -> dict:
-    """给 /connect 页的二维码用：返回 bot 用户名与配置状态。"""
+    """For the QR code on the /connect page: returns the bot username and configuration status."""
     token = str(get_setting(db, "telegram_bot_token") or "")
     chat_id = str(get_setting(db, "telegram_chat_id") or "")
     enabled = bool(get_setting(db, "notify_telegram_enabled"))
@@ -54,12 +54,13 @@ def _reply(token: str, chat_id: str, text: str) -> None:
 
 
 def poll_commands() -> None:
-    """调度器定时调用：拉取新消息 → 建任务 → 回执。
+    """Called periodically by the scheduler: fetch new messages → create tasks → acknowledge.
 
-    分四段执行，所有网络调用都在 DB 会话之外——会话内做网络会让
-    autoflush 拿到的 SQLite 写锁横跨 15s 的 HTTP 请求，堵死全站写操作。
+    Executed in four stages, with all network calls kept outside the DB session — doing
+    network work inside a session would let the SQLite write lock held by autoflush span
+    a 15s HTTP request, blocking writes across the entire application.
     """
-    # ① 短会话读配置
+    # ① Short session to read configuration
     with session() as db:
         token = str(get_setting(db, "telegram_bot_token") or "")
         chat_id = str(get_setting(db, "telegram_chat_id") or "")
@@ -67,7 +68,7 @@ def poll_commands() -> None:
     if not token or not chat_id:
         return
 
-    # ② 网络拉取（无会话）
+    # ② Network fetch (no session)
     try:
         resp = httpx.get(f"https://api.telegram.org/bot{token}/getUpdates",
                          params={"offset": offset + 1, "timeout": 0}, timeout=15)
@@ -77,8 +78,8 @@ def poll_commands() -> None:
     if not updates:
         return
 
-    # ③ 短会话建任务 + 推进游标（回执先攒着）
-    from ..api.tasks import _parse_prompt  # 局部导入避免环形依赖
+    # ③ Short session to create tasks + advance the cursor (acknowledgements batched for later)
+    from ..api.tasks import _parse_prompt  # local import to avoid a circular dependency
 
     replies: list[str] = []
     with session() as db:
@@ -88,7 +89,7 @@ def poll_commands() -> None:
             text = (msg.get("text") or "").strip()
             from_chat = str((msg.get("chat") or {}).get("id", ""))
             if not text or from_chat != chat_id:
-                continue  # 非授权 chat 一律忽略
+                continue  # ignore all unauthorized chats
             if text.startswith(("/start", "/help")):
                 replies.append(HELP_TEXT)
                 continue
@@ -102,6 +103,6 @@ def poll_commands() -> None:
             replies.append(f"✅ Task queued: *{title}*\nI'm on it — results will be in your console and next briefing.")
         set_setting(db, "telegram_update_offset", offset)
 
-    # ④ 会话已提交关闭，再发回执（任务已持久化，回执语义也更准确）
+    # ④ Session already committed and closed, then send acknowledgements (tasks are persisted, so the ack semantics are also more accurate)
     for text in replies:
         _reply(token, chat_id, text)

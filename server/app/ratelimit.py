@@ -1,11 +1,12 @@
-"""入站 HTTP 限流：按客户端 IP 的固定窗口计数，保护常驻控制平面小机免遭
-公网扫描/请求洪水打爆。纯 ASGI 中间件（不包裹响应），因此不影响 /api/events 的
-SSE 长连接。
+"""Inbound HTTP rate limiting: fixed-window counting per client IP, protecting the
+always-on control-plane box from being overwhelmed by public scanning / request floods.
+Pure ASGI middleware (does not wrap responses), so it does not affect the long-lived
+SSE connection of /api/events.
 
-与 core/scheduler/ratelimit.py 无关——那个是约束**出站** LLM 调用的令牌桶；
-本模块约束的是**入站** HTTP 请求量。
+Unrelated to core/scheduler/ratelimit.py — that one is a token bucket constraining
+**outbound** LLM calls; this module constrains **inbound** HTTP request volume.
 
-超限事件（429）会被记入 ./data/ratelimit.log，用于监测公网扫描/攻击。
+Over-limit events (429) are recorded to ./data/ratelimit.log for monitoring public scanning/attacks.
 """
 from __future__ import annotations
 
@@ -19,11 +20,11 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from .config import config
 
-_WINDOW = 60.0  # 秒；固定窗口长度
+_WINDOW = 60.0  # seconds; fixed-window length
 
 
 def _client_ip(scope: Scope) -> str:
-    # 后端只经 web 层（Next rewrites）反代对外，真实客户端 IP 在 X-Forwarded-For 里。
+    # The backend is only exposed via the web layer (Next rewrites) reverse proxy, so the real client IP is in X-Forwarded-For.
     for name, value in scope.get("headers") or []:
         if name == b"x-forwarded-for":
             return value.decode("latin-1").split(",")[0].strip()
@@ -32,7 +33,7 @@ def _client_ip(scope: Scope) -> str:
 
 
 class RateLimitMiddleware:
-    """每 IP 每 60s 窗口最多 rpm 次请求；超限返回 429 + Retry-After。"""
+    """At most rpm requests per IP per 60s window; over-limit returns 429 + Retry-After."""
 
     def __init__(self, app: ASGIApp, rpm: int = 240,
                  exempt_prefixes: tuple[str, ...] = ("/healthz",)) -> None:
@@ -43,7 +44,7 @@ class RateLimitMiddleware:
         self._lock = Lock()
 
     def _check(self, ip: str, path: str = "") -> int:
-        """返回本窗口内该 IP 的累计请求数（含本次）。"""
+        """Return the cumulative request count for this IP within the current window (including this one)."""
         now = time.monotonic()
         with self._lock:
             start, count = self._hits.get(ip, (now, 0))
@@ -51,17 +52,17 @@ class RateLimitMiddleware:
                 start, count = now, 0
             count += 1
             self._hits[ip] = (start, count)
-            if len(self._hits) > 10_000:  # 顺手驱逐过期条目，防内存无限增长
+            if len(self._hits) > 10_000:  # opportunistically evict expired entries to prevent unbounded memory growth
                 cutoff = now - _WINDOW
                 self._hits = {k: v for k, v in self._hits.items() if v[0] >= cutoff}
 
-            # 超限时写日志
+            # Log when over the limit
             if count > self.rpm:
                 self._log_throttle(ip, path, count)
             return count
 
     def _log_throttle(self, ip: str, path: str, count: int) -> None:
-        """记录限流事件到 ./data/ratelimit.log（便于监测扫描/攻击）。"""
+        """Record the rate-limit event to ./data/ratelimit.log (to help monitor scanning/attacks)."""
         try:
             logfile = config.data_dir / "ratelimit.log"
             event = {
@@ -74,7 +75,7 @@ class RateLimitMiddleware:
             with open(logfile, "a") as f:
                 f.write(json.dumps(event, ensure_ascii=False) + "\n")
         except Exception:
-            pass  # 日志写失败不应该影响请求
+            pass  # a log write failure should never affect the request
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":

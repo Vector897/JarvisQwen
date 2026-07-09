@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-/** 公开落地页（无需登录）：隐私声明置顶 → 宣言 → 使命 → 作者与仓库。
- *  独立暗色画布（nav/topbar 在 /home 不渲染），风格与 Logo 一致。 */
+/** Public landing page (no login required): privacy notice at the top → manifesto → mission → author & repository.
+ *  Standalone dark canvas (nav/topbar are not rendered on /home), styled to match the logo. */
 
 const REPO = "https://github.com/Vector897/JarvisQwen";
 
@@ -27,7 +27,7 @@ export default function Home() {
   const codeInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // api.ts 在访问码网关 401 时跳回 /home?code=required——高亮输入框、说明原因并聚焦
+    // api.ts redirects back to /home?code=required on a 401 from the access-code gate — highlight the input, explain why, and focus it
     const need = new URLSearchParams(window.location.search).get("code") === "required";
     setNeedCode(need);
     if (need) codeInput.current?.focus();
@@ -37,7 +37,7 @@ export default function Home() {
     e.preventDefault();
     const k = code.trim();
     if (!k) return;
-    // 走 middleware 的魔法链接逻辑：?k= 写入 aaos_access cookie 后跳到干净的 /dashboard
+    // Use the middleware's magic-link logic: ?k= writes the aaos_access cookie, then redirects to a clean /dashboard
     window.location.href = `/dashboard?k=${encodeURIComponent(k)}`;
   }
 
@@ -52,7 +52,7 @@ export default function Home() {
           </h1>
           <p className="mt-3 text-sm tracking-widest text-sky-400/80">YOUR 24/7 AI BUTLER · POWERED BY QWEN</p>
 
-          {/* CTA —— 移到 JarvisQwen 下一行 */}
+          {/* CTA — moved to the line below JarvisQwen */}
           <div className="mt-7 flex flex-wrap justify-center gap-3">
             <Link href="/dashboard"
               className="rounded-xl bg-sky-500 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-400">
@@ -68,8 +68,8 @@ export default function Home() {
             </a>
           </div>
 
-          {/* 访问码入口：公网 demo 的 /api 全部要求访问码；没走 ?k= 魔法链接的
-              访客点 Quick Try 会被 401 弹回到这里（?code=required 高亮提示） */}
+          {/* Access-code entry: all /api routes on the public demo require an access code; a visitor who
+              didn't arrive via a ?k= magic link and clicks Quick Try gets bounced back here by a 401 (?code=required highlights the prompt) */}
           <form onSubmit={enterWithCode}
             className={`mt-5 flex w-full max-w-md flex-col items-center gap-2 rounded-2xl border p-4 transition
               ${needCode ? "border-amber-500/70 bg-amber-950/30" : "border-slate-800 bg-slate-900/40"}`}>
@@ -96,7 +96,7 @@ export default function Home() {
           </form>
         </div>
 
-        {/* 隐私声明——放在最前面 */}
+        {/* Privacy notice — placed first */}
         <div className="mx-6 mt-8 rounded-2xl border border-emerald-700/40 bg-emerald-950/40 p-5 text-sm leading-relaxed">
           <p className="font-semibold text-emerald-300">🔒 Before anything else, know this:</p>
           <p className="mt-2 text-emerald-100/90">
@@ -110,7 +110,7 @@ export default function Home() {
           </p>
         </div>
 
-        {/* 使命 */}
+        {/* Mission */}
         <div className="px-8 py-10 text-center">
           <h2 className="text-xl font-bold text-white">Why this exists</h2>
           <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-slate-400">
@@ -135,7 +135,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 作者与仓库 */}
+        {/* Author & repository */}
         <div className="border-t border-slate-800/80 px-8 py-8 text-center text-sm">
           <p className="text-slate-400">
             Built and actively maintained by{" "}

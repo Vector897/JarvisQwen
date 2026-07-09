@@ -3,16 +3,16 @@
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
 
-/** 帮助页（技术参考）：任务流水线、成本架构、防呆机制、名词速查、疑难排查。
- *  产品定位/上手流程/各页面作用在「使用指南」（/guidelines），本页不重复。
- *  中英双语内联对照，语言开关切换。 */
+/** Help page (technical reference): task pipeline, cost architecture, safety rails, glossary, troubleshooting.
+ *  Product positioning / getting started / per-page roles live in the Guidelines (/guidelines); not repeated here.
+ *  Bilingual inline (EN/ZH), toggled by the language switch. */
 
 export default function Help() {
   const { lang } = useLang();
   const L = (en: string, zh: string) => (lang === "zh" ? zh : en);
   return (
     <div className="space-y-6 leading-relaxed">
-      {/* 页头：定位说明 + 指向使用指南 */}
+      {/* Page header: positioning note + pointer to the Guidelines */}
       <section className="card space-y-1">
         <h2 className="text-lg font-bold">{L("Technical reference", "技术参考文档")}</h2>
         <p className="text-sm text-slate-600">
@@ -30,7 +30,7 @@ export default function Help() {
         </p>
       </section>
 
-      {/* ① 任务流水线 */}
+      {/* (1) Task pipeline */}
       <section className="space-y-2">
         <h2 className="text-lg font-bold">{L("1. The task pipeline (the life of one task)", "一、任务流水线（一条任务的一生）")}</h2>
         <div className="card">
@@ -52,7 +52,7 @@ export default function Help() {
         </div>
       </section>
 
-      {/* ② 成本架构 */}
+      {/* (2) Cost architecture */}
       <section className="space-y-2">
         <h2 className="text-lg font-bold">{L("2. Cost architecture: three-tier model routing", "二、成本架构：三级模型路由")}</h2>
         <p className="text-sm text-slate-600">
@@ -71,7 +71,7 @@ export default function Help() {
         </div>
       </section>
 
-      {/* ③ 防呆机制 */}
+      {/* (3) Safety rails */}
       <section className="space-y-2">
         <h2 className="text-lg font-bold">{L("3. 🛡️ Safety rails (no runaway bills, no data loss, no rogue actions)", "三、🛡️ 防呆机制（不会烧钱、不会丢数据、不会失控）")}</h2>
         <div className="space-y-2">
@@ -128,7 +128,7 @@ export default function Help() {
         </div>
       </section>
 
-      {/* ④ 名词速查 */}
+      {/* (4) Glossary */}
       <section className="space-y-2">
         <h2 className="text-lg font-bold">{L("4. Glossary", "四、名词速查")}</h2>
         <div className="card grid gap-2 text-sm md:grid-cols-2">
@@ -151,7 +151,7 @@ export default function Help() {
         </div>
       </section>
 
-      {/* ⑤ 疑难排查 */}
+      {/* (5) Troubleshooting */}
       <section className="space-y-2">
         <h2 className="text-lg font-bold">{L("5. Troubleshooting", "五、疑难排查")}</h2>
         <div className="space-y-2">

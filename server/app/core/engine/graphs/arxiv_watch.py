@@ -1,6 +1,6 @@
-"""学术工作流主图：轮询 → 去重 → 初筛 → 下载归档 → 逐篇总结 → 写记忆。
+"""Academic workflow main graph: poll → dedupe → triage → download & archive → per-item summarize → write memory.
 
-对应架构文档 3.7 学术工作流。params: {"query": "...", "max_results": 15}
+Corresponds to architecture doc 3.7 Academic Workflow. params: {"query": "...", "max_results": 15}
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from ...settings_store import get_setting
 from ..engine import StepDef, TaskContext, register
 
 
-MAX_DEEP = 6  # 单次任务最多深度总结的条目数（控成本与时长）
+MAX_DEEP = 6  # max number of items deep-summarized per task (controls cost and duration)
 
 
 def fingerprint(title: str, arxiv_id: str) -> str:
@@ -27,11 +27,11 @@ def fingerprint(title: str, arxiv_id: str) -> str:
 
 
 def _route_source(ctx: TaskContext, query: str) -> str:
-    """判定查询该走 'arxiv' 还是 'news'。
+    """Decide whether a query should go to 'arxiv' or 'news'.
 
-    优先用轻量层 LLM 分类——关键词允许列表判不准非学术查询（名人/产品名会误入
-    arXiv：如 "Taylor Swift" 会命中泰勒展开类论文）。dry-run（无 Key，返回 simulated）
-    或分类失败时回退到启发式 is_news_query。分类结果走语义缓存，重复查询 0 成本。"""
+    Prefer classification by the light-tier LLM — a keyword allowlist can't reliably judge non-academic queries (celebrity/product names slip into
+    arXiv: e.g. "Taylor Swift" would match Taylor-expansion papers). On dry-run (no Key, returns simulated)
+    or classification failure, fall back to the heuristic is_news_query. Classification results go through the semantic cache, so repeated queries cost 0."""
     prompt = (
         "Classify this search query as exactly one word — 'academic' or 'news'.\n"
         "academic = scholarly research: papers, science, math, algorithms, ML/AI methods.\n"
@@ -47,25 +47,25 @@ def _route_source(ctx: TaskContext, query: str) -> str:
                 return "news"
             if "academic" in ans or "arxiv" in ans:
                 return "arxiv"
-    except Exception:  # noqa: BLE001  分类失败不阻断，落到启发式
+    except Exception:  # noqa: BLE001  classification failure is non-blocking, fall through to the heuristic
         pass
     return "news" if news.is_news_query(query) else "arxiv"
 
 
 def step_fetch(ctx: TaskContext, state: dict) -> dict:
-    """抓取候选条目。LLM 判定学术/新闻后走对应源；所选源为空时反向兜底，
-    保证"任意查询都有结果"且不会把名人/产品查询错配成无关论文。"""
+    """Fetch candidate items. After the LLM decides academic/news, use the corresponding source; if the chosen source is empty, fall back to the other,
+    guaranteeing "any query yields results" and that celebrity/product queries aren't mismatched to unrelated papers."""
     params = state["params"]
     query = params.get("query", "LLM agents")
     n = int(params.get("max_results", 15))
     source = _route_source(ctx, query)
     if source == "news":
         found = news.search(query, n)
-        if not found:  # 新闻空 → 反向退学术
+        if not found:  # news empty → fall back to academic
             found, source = arxiv.search(query, n), "arxiv"
     else:
         found = arxiv.search(query, n)
-        if not found:  # 学术空 → 退回新闻
+        if not found:  # academic empty → fall back to news
             found, source = news.search(query, n), "news"
     state["found"] = found
     state["source"] = source
@@ -89,12 +89,12 @@ def step_dedupe(ctx: TaskContext, state: dict) -> dict:
 
 
 def step_filter(ctx: TaskContext, state: dict) -> dict:
-    """轻量层初筛：按用户研究方向给相关度打分。"""
+    """Light-tier triage: score relevance against the user's research focus."""
     fresh = state["fresh"]
     if not fresh:
         state["selected"] = []
         return state
-    # 新闻按"查询词"判相关（命中查询的文章都相关）；论文按用户研究画像判相关。
+    # News relevance is judged by the "query terms" (any article matching the query is relevant); papers are judged by the user's research profile.
     if state.get("source") == "news":
         profile = state["params"].get("query", "") or str(get_setting(ctx.db, "research_profile"))
     else:
@@ -112,9 +112,9 @@ def step_filter(ctx: TaskContext, state: dict) -> dict:
         start, end = text.find("["), text.rfind("]")
         for item in json.loads(text[start : end + 1]):
             scores[int(item["i"])] = float(item["score"])
-    except Exception:  # noqa: BLE001  解析失败（或 dry-run）→ 全部通过，宁多勿漏
+    except Exception:  # noqa: BLE001  parse failure (or dry-run) → let everything through, better too many than miss any
         scores = {i: 1.0 for i in range(len(fresh))}
-    # 过阈值后按分数降序，最多深度总结 MAX_DEEP 篇（控成本/时长：新闻常全部命中）
+    # After passing the threshold, sort by score descending and deep-summarize at most MAX_DEEP items (controls cost/duration: news often all match)
     passing = sorted((i for i in range(len(fresh)) if scores.get(i, 0) >= threshold),
                      key=lambda i: scores.get(i, 0), reverse=True)
     selected = [fresh[i] for i in passing[:MAX_DEEP]]
@@ -125,10 +125,10 @@ def step_filter(ctx: TaskContext, state: dict) -> dict:
 
 
 def step_ingest(ctx: TaskContext, state: dict) -> dict:
-    """下载 PDF 并入库（纯代码，0 token）。"""
+    """Download PDFs and store them (pure code, 0 tokens)."""
     stored_ids = []
     for p in state["selected"]:
-        # 逐篇提交后崩溃重跑的幂等兜底：该指纹已入库则复用，不重复下载/插入
+        # idempotent fallback for crash-and-rerun after per-item commit: if this fingerprint is already stored, reuse it without re-downloading/re-inserting
         prev = ctx.db.execute(select(Paper).where(Paper.dedup_fingerprint == p["fingerprint"])).scalar_one_or_none()
         if prev is not None:
             stored_ids.append(prev.id)
@@ -140,7 +140,7 @@ def step_ingest(ctx: TaskContext, state: dict) -> dict:
             pdf_path=pdf_path, dedup_fingerprint=p["fingerprint"], owner_id=ctx.task.owner_id,
         )
         ctx.db.add(paper)
-        ctx.db.commit()  # 逐篇提交而非 flush：flush 拿到的写锁会横跨下一篇的 PDF 下载（网络）
+        ctx.db.commit()  # commit per item rather than flush: a write lock from flush would span the next item's PDF download (network)
         stored_ids.append(paper.id)
     state["paper_ids"] = stored_ids
     ctx.artifact("Archive manifest", f"Archived {len(stored_ids)} papers (PDF + metadata)")
@@ -148,13 +148,13 @@ def step_ingest(ctx: TaskContext, state: dict) -> dict:
 
 
 def step_summarize(ctx: TaskContext, state: dict) -> dict:
-    """前沿层逐篇总结。断点友好：逐篇记录进度，重跑跳过已完成。"""
+    """Frontier-tier per-item summarization. Checkpoint-friendly: record progress per item, skip completed ones on rerun."""
     done: list[str] = state.setdefault("summarized", [])
     ids = state.get("paper_ids", [])
     for idx, pid in enumerate(ids):
         if pid in done:
             continue
-        # 上次运行已总结并提交过 → 幂等跳过，不重复付费（逐篇提交后崩溃重跑的兜底）。
+        # already summarized and committed in a previous run → idempotently skip without paying again (fallback for crash-and-rerun after per-item commit).
         if ctx.db.execute(select(Summary).where(Summary.paper_id == pid)).first():
             done.append(pid)
             continue
@@ -179,8 +179,8 @@ def step_summarize(ctx: TaskContext, state: dict) -> dict:
         ctx.db.add(Summary(paper_id=pid, model=result.model, content_md=result.text,
                            cost_usd=result.cost_usd))
         done.append(pid)
-        # 逐篇上报步内进度：这是唯一足够长的步骤（多次 ~120s 调用），不上报进度条会冻结。
-        # report_progress 内部 commit——同时完成"逐篇提交释放写锁"，两个目的合一。
+        # report intra-step progress per item: this is the only step long enough (multiple ~120s calls); without reporting the progress bar freezes.
+        # report_progress commits internally — also accomplishing "per-item commit releases the write lock", two goals in one.
         ctx.report_progress((idx + 1) / len(ids),
                             sub_progress=f"Summarizing {idx + 1}/{len(ids)}")
     ctx.artifact("Summaries done", f"Summarized {len(done)} papers")

@@ -1,4 +1,4 @@
-"""最简测试图：验证队列、引擎、检查点、SSE 全链路。"""
+"""Minimal test graph: verify the full chain of queue, engine, checkpoint, SSE."""
 from __future__ import annotations
 
 import time

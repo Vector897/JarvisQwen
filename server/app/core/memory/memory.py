@@ -1,7 +1,8 @@
-"""记忆系统：情节记忆写入、夜间整合为语义记忆、两层检索、热度衰减驱逐。
+"""Memory system: episodic memory writes, nightly consolidation into semantic memory, two-layer retrieval, heat-decay eviction.
 
-对应调研报告《大模型记忆管理》：以任务执行为天然情节边界；
-整合（Consolidation）在低峰定时执行；检索先 SQL 标签过滤再文本匹配（V2 换向量）。
+Corresponds to the research report "LLM Memory Management": task execution serves as a natural
+episode boundary; consolidation runs on a schedule during off-peak hours; retrieval first filters by
+SQL tags then matches text (V2 switches to vectors).
 """
 from __future__ import annotations
 
@@ -19,7 +20,7 @@ def write_episodic(db: Session, owner_id: str, content: str, tags: str = "") -> 
 
 
 def retrieve(db: Session, owner_id: str, query_terms: list[str], limit: int = 10) -> list[Memory]:
-    """两层检索：标签/关键词过滤 → 按热度与新近度排序。命中的记忆热度+1。"""
+    """Two-layer retrieval: tag/keyword filtering → sort by heat and recency. Matched memories get heat +1."""
     rows = db.execute(
         select(Memory).where(Memory.owner_id == owner_id, Memory.archived == 0)
     ).scalars().all()
@@ -44,7 +45,7 @@ def _keyword_overlap(a: str, b: str) -> float:
 
 
 def _find_conflict(db: Session, owner_id: str, new_fact: str) -> Memory | None:
-    """粗粒度冲突检测：找与新事实主题重叠但内容不同的既有语义记忆（时序仲裁候选）。"""
+    """Coarse-grained conflict detection: find an existing semantic memory whose topic overlaps the new fact but whose content differs (a candidate for temporal arbitration)."""
     existing = db.execute(
         select(Memory).where(Memory.kind == "semantic", Memory.owner_id == owner_id, Memory.archived == 0)
     ).scalars().all()
@@ -53,14 +54,14 @@ def _find_conflict(db: Session, owner_id: str, new_fact: str) -> Memory | None:
         overlap = _keyword_overlap(new_fact, m.content)
         if overlap > best_score:
             best_score, best = overlap, m
-    # 主题重叠但不是同一句话 → 可能是同一话题的新旧表述，交给仲裁
+    # Topic overlaps but it's not the same sentence → possibly old/new phrasings of the same topic, hand off to arbitration
     if best is not None and 0.35 <= best_score < 0.95:
         return best
     return None
 
 
 def _arbitrate(db: Session, old: Memory, new_fact: str) -> str:
-    """时序仲裁：生成保留历史连续性的调和摘要，而非硬覆盖。"""
+    """Temporal arbitration: produce a reconciling summary that preserves historical continuity, rather than a hard overwrite."""
     prompt = (
         "Below are two records on the same topic from different points in time; they may conflict. "
         "Write ONE sentence that reconciles them with explicit time sense "
@@ -72,7 +73,7 @@ def _arbitrate(db: Session, old: Memory, new_fact: str) -> str:
 
 
 def consolidate(db: Session, owner_id: str) -> int:
-    """夜间整合：把近 24h 情节记忆交给轻量层提炼为语义记忆；冲突时时序仲裁而非硬覆盖。"""
+    """Nightly consolidation: hand the last 24h of episodic memories to the light tier to distill into semantic memory; on conflict, use temporal arbitration rather than a hard overwrite."""
     cutoff = time.time() - 86400
     episodes = db.execute(
         select(Memory).where(
@@ -108,7 +109,7 @@ def consolidate(db: Session, owner_id: str) -> int:
 
 
 def decay_heat(db: Session, factor: float = 0.95, archive_below: float = 0.05) -> int:
-    """遗忘曲线：热度衰减，过低者移出检索索引（归档不删除）。"""
+    """Forgetting curve: heat decays, and entries too low are removed from the retrieval index (archived, not deleted)."""
     rows = db.execute(select(Memory).where(Memory.archived == 0)).scalars().all()
     archived = 0
     for m in rows:

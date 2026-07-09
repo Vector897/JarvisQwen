@@ -1,4 +1,4 @@
-"""部署级配置：环境变量 / .env。业务级配置（模型、预算、脱敏等级）在 settings 表，Web 热调。"""
+"""Deployment-level config: environment variables / .env. Business-level config (model, budget, redaction level) lives in the settings table and is hot-tunable from the Web UI."""
 from __future__ import annotations
 
 import secrets
@@ -15,10 +15,10 @@ class Config(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     daily_budget_usd: float = 2.0
-    web_origin: str = ""  # 模式 B 的 Vercel 域名（CORS 兜底）
-    ratelimit_enabled: bool = True  # 入站限流（公网部署防扫描/洪水）
-    ratelimit_rpm: int = 240        # 每分钟请求上限；正常使用远达不到
-    access_code: str = ""           # 设置后，/api 需带此访问码（cookie/?k=/header）；空=完全开放
+    web_origin: str = ""  # Vercel domain for mode B (CORS fallback)
+    ratelimit_enabled: bool = True  # inbound rate limiting (guards public deployments against scanning/floods)
+    ratelimit_rpm: int = 240        # per-minute request ceiling; normal use stays well below this
+    access_code: str = ""           # when set, /api requires this access code (cookie/?k=/header); empty = fully open
 
     @property
     def db_url(self) -> str:

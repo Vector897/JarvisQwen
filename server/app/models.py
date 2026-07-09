@@ -1,4 +1,4 @@
-"""全部 ORM 模型。对应《项目代码架构.md》第四节数据模型。"""
+"""All ORM models (data model layer)."""
 from __future__ import annotations
 
 import time
@@ -36,7 +36,7 @@ class ApiKey(Base):
     encrypted_key: Mapped[str] = mapped_column(Text)
     base_url: Mapped[str] = mapped_column(String(256), default="")  # custom OpenAI-compatible endpoint
     label: Mapped[str] = mapped_column(String(64), default="")
-    priority: Mapped[int] = mapped_column(Integer, default=0)  # 多 Key 轮换顺序
+    priority: Mapped[int] = mapped_column(Integer, default=0)  # rotation order across multiple keys
     status: Mapped[str] = mapped_column(String(16), default="active")  # active/rate_limited/broken
     owner_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"))
     created_at: Mapped[float] = mapped_column(Float, default=now)
@@ -49,14 +49,14 @@ class Task(Base):
     title: Mapped[str] = mapped_column(String(256), default="")
     params_json: Mapped[str] = mapped_column(Text, default="{}")
     owner_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"))
-    priority: Mapped[int] = mapped_column(Integer, default=5)  # 1 最高
+    priority: Mapped[int] = mapped_column(Integer, default=5)  # 1 is highest
     # QUEUED/RUNNING/SUSPENDED/WAITING_APPROVAL/DONE/FAILED/ZOMBIE/CANCELLED
     status: Mapped[str] = mapped_column(String(20), default="QUEUED", index=True)
     lease_until: Mapped[float] = mapped_column(Float, default=0)
     budget_limit_usd: Mapped[float] = mapped_column(Float, default=1.0)
     cost_usd: Mapped[float] = mapped_column(Float, default=0)
     progress: Mapped[float] = mapped_column(Float, default=0)  # 0..1
-    eta_ts: Mapped[float] = mapped_column(Float, default=0)  # 预估完成时间戳；0=未知
+    eta_ts: Mapped[float] = mapped_column(Float, default=0)  # estimated completion timestamp; 0 = unknown
     error: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[float] = mapped_column(Float, default=now)
     finished_at: Mapped[float] = mapped_column(Float, default=0)
@@ -68,12 +68,12 @@ class Checkpoint(Base):
     task_id: Mapped[str] = mapped_column(String(32), ForeignKey("tasks.id"), index=True)
     step_index: Mapped[int] = mapped_column(Integer)
     step_name: Mapped[str] = mapped_column(String(64))
-    state_json: Mapped[str] = mapped_column(Text)  # 任务状态快照，断点续跑依据
+    state_json: Mapped[str] = mapped_column(Text)  # task state snapshot; basis for resume-from-checkpoint
     created_at: Mapped[float] = mapped_column(Float, default=now)
 
 
 class StepStat(Base):
-    """各任务类型每步的历史耗时（指数移动平均），ETA 计算依据。"""
+    """Per-step historical duration for each task type (exponential moving average); basis for ETA calculation."""
 
     __tablename__ = "step_stats"
     id: Mapped[str] = mapped_column(String(96), primary_key=True)  # f"{task_type}:{step_name}"
@@ -87,7 +87,7 @@ class Subscription(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=uid)
     owner_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"))
     source: Mapped[str] = mapped_column(String(32), default="arxiv")
-    query: Mapped[str] = mapped_column(String(512))  # arXiv 检索式或关键词
+    query: Mapped[str] = mapped_column(String(512))  # arXiv search query or keywords
     interval_minutes: Mapped[int] = mapped_column(Integer, default=360)
     enabled: Mapped[int] = mapped_column(Integer, default=1)
     last_run_at: Mapped[float] = mapped_column(Float, default=0)
@@ -128,7 +128,7 @@ class Memory(Base):
     tags: Mapped[str] = mapped_column(String(256), default="")
     ts: Mapped[float] = mapped_column(Float, default=now)
     confidence: Mapped[float] = mapped_column(Float, default=0.8)
-    heat: Mapped[float] = mapped_column(Float, default=1.0)  # 访问频率×新近度；夜间衰减
+    heat: Mapped[float] = mapped_column(Float, default=1.0)  # access frequency × recency; decays overnight
     archived: Mapped[int] = mapped_column(Integer, default=0)
     owner_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"))
 
@@ -154,7 +154,7 @@ class Approval(Base):
 
 
 class AuditLog(Base):
-    """append-only 推理-行动日志。"""
+    """Append-only reasoning-action log."""
 
     __tablename__ = "audit_log"
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=uid)
@@ -182,7 +182,7 @@ class LlmCache(Base):
 
 
 class Setting(Base):
-    """业务级配置，Web 端热调。"""
+    """Business-level config, hot-tunable from the Web UI."""
 
     __tablename__ = "settings"
     key: Mapped[str] = mapped_column(String(64), primary_key=True)

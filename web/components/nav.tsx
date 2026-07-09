@@ -25,7 +25,7 @@ export default function Nav() {
   if (pathname === "/login" || pathname === "/home") return null;
   return (
     <>
-      {/* 桌面端侧栏 */}
+      {/* Desktop sidebar */}
       <nav className="hidden md:flex w-52 shrink-0 flex-col gap-1 border-r border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <Link href="/home" className="mb-4 flex items-center gap-2 text-lg font-bold">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -39,7 +39,7 @@ export default function Nav() {
           </Link>
         ))}
       </nav>
-      {/* 移动端底栏（高频入口） */}
+      {/* Mobile bottom bar (high-frequency entries) */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex justify-around border-t border-slate-200 bg-white py-2 dark:border-slate-800 dark:bg-slate-900 md:hidden">
         {items.slice(0, 5).map(([href, icon, key]) => (
           <Link key={href} href={href}

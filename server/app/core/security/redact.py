@@ -1,7 +1,7 @@
-"""出境脱敏网关：三层检测堆栈（正则 → 熵 → 可选 NER），占位符映射与还原。
+"""Egress redaction gateway: a three-tier detection stack (regex → entropy → optional NER), with placeholder mapping and restoration.
 
-对应调研报告《敏感数据管理与脱敏》：Tier1 确定性正则、Tier2 香农熵、Tier3 NER（Presidio 可选安装）。
-默认修改模式（替换占位符，返回后还原）；redact_level=high 时对高危命中直接阻断（验证模式）。
+Corresponds to the research report "Sensitive Data Management and Redaction": Tier 1 deterministic regex, Tier 2 Shannon entropy, Tier 3 NER (Presidio, optionally installed).
+Default modification mode (replace with placeholders, restore after the response returns); when redact_level=high, high-risk hits are blocked outright (validation mode).
 """
 from __future__ import annotations
 
@@ -9,11 +9,11 @@ import math
 import re
 from dataclasses import dataclass, field
 
-# ---- Tier 1: 确定性正则 ----
+# ---- Tier 1: deterministic regex ----
 PATTERNS: list[tuple[str, re.Pattern]] = [
     ("EMAIL", re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")),
     ("PHONE_CN", re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")),
-    ("ID_CN", re.compile(r"(?<!\d)\d{17}[\dXx](?!\d)")),  # 身份证
+    ("ID_CN", re.compile(r"(?<!\d)\d{17}[\dXx](?!\d)")),  # national ID card
     ("CREDIT_CARD", re.compile(r"(?<!\d)\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{4}(?!\d)")),
     ("API_KEY", re.compile(r"\b(?:sk|pk|rk)-[A-Za-z0-9_-]{16,}\b")),
     ("AWS_KEY", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
@@ -21,7 +21,7 @@ PATTERNS: list[tuple[str, re.Pattern]] = [
 ]
 HIGH_RISK = {"API_KEY", "AWS_KEY", "ID_CN", "CREDIT_CARD"}
 
-# ---- Tier 2: 熵检测（无固定格式的密钥/令牌）----
+# ---- Tier 2: entropy detection (secrets/tokens without a fixed format) ----
 TOKEN_RE = re.compile(r"\b[A-Za-z0-9+/_=-]{28,}\b")
 
 
@@ -50,7 +50,7 @@ class RedactionResult:
 
 def redact(text: str, level: str = "medium") -> RedactionResult:
     if level == "low":
-        # 低等级只拦截明确的凭证
+        # The low level intercepts only explicit credentials
         active = [(n, p) for n, p in PATTERNS if n in ("API_KEY", "AWS_KEY")]
     else:
         active = PATTERNS
@@ -88,7 +88,7 @@ def redact(text: str, level: str = "medium") -> RedactionResult:
     if level == "high" and high_risk_hit:
         return RedactionResult(text="", mapping={}, blocked=True, reason="High-risk sensitive data detected; egress blocked (strict mode)")
 
-    # Tier 3: Presidio NER（可选依赖，装了才启用）
+    # Tier 3: Presidio NER (optional dependency, enabled only when installed)
     try:
         from presidio_analyzer import AnalyzerEngine  # type: ignore
 

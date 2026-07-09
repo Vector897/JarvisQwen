@@ -1,4 +1,4 @@
-"""登录鉴权：PBKDF2 口令哈希 + HMAC 签名会话 cookie + RBAC 依赖项。"""
+"""Login authentication: PBKDF2 password hashing + HMAC-signed session cookie + RBAC dependencies."""
 from __future__ import annotations
 
 import base64
@@ -60,9 +60,11 @@ def parse_session_token(token: str) -> str | None:
 
 
 def _default_user(db: Session) -> User | None:
-    """免登录回退。本地单机模式（无访问码）回退到 admin，保持零配置体验；
-    公网演示模式（设置了访问码）回退到受限的 demo member——过访问码闸门
-    只代表"可以体验"，不代表拥有管理权限（改预算/模型/Key/用户须登录 admin）。"""
+    """No-login fallback. In local single-machine mode (no access code) it falls back
+    to admin, preserving the zero-config experience; in public demo mode (access code
+    set) it falls back to a restricted demo member — passing the access-code gate only
+    means "allowed to try it out", not that you hold admin rights (changing
+    budget/model/keys/users requires logging in as admin)."""
     if config.access_code:
         demo = db.execute(select(User).where(User.name == "demo")).scalar_one_or_none()
         if demo is None:
@@ -71,7 +73,7 @@ def _default_user(db: Session) -> User | None:
                             password_hash=hash_password(secrets.token_urlsafe(24)))
                 db.add(demo)
                 db.flush()
-            except Exception:  # noqa: BLE001  并发首访撞 name 唯一约束 → 取已建的
+            except Exception:  # noqa: BLE001  concurrent first-access hits the name unique constraint → fetch the one already created
                 db.rollback()
                 demo = db.execute(select(User).where(User.name == "demo")).scalar_one_or_none()
         return demo
@@ -85,7 +87,7 @@ def current_user(
     db: Session = Depends(get_db),
     aaos_session: str | None = Cookie(default=None),
 ) -> User:
-    # 有有效会话则用之；否则退回默认本地账户（"快速尝试"免登录直接可用）。
+    # Use a valid session if present; otherwise fall back to the default local account ("quick try" works without login).
     if aaos_session:
         uid = parse_session_token(aaos_session)
         if uid:
@@ -105,7 +107,7 @@ def require_admin(user: User = Depends(current_user)) -> User:
 
 
 def ensure_admin_user() -> None:
-    """首次启动创建 admin，密码写入 data/admin_password.txt 并打印到日志。"""
+    """On first startup, create admin; write the password to data/admin_password.txt and print it to the log."""
     from .db import session
 
     with session() as db:

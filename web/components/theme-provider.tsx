@@ -9,7 +9,7 @@ const ThemeCtx = createContext<{ theme: Theme; toggle: () => void }>({
 });
 export const useTheme = () => useContext(ThemeCtx);
 
-/** 防闪烁：在首次渲染前同步读取 localStorage 并打上 class，放在 <head> 里内联执行。 */
+/** Anti-flicker: synchronously read localStorage and apply the class before the first render, executed inline in <head>. */
 export const THEME_INIT_SCRIPT = `
 try {
   var t = localStorage.getItem('aaos-theme') ||

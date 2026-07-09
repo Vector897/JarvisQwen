@@ -1,13 +1,13 @@
-"""轻量任务引擎：顺序步骤 + 检查点续跑 + ETA + Artifacts + 人类在环中断。
+"""Lightweight task engine: sequential steps + checkpoint resume + ETA + Artifacts + human-in-the-loop interruption.
 
-V1 用自研引擎（零额外依赖、行为完全可控）；接口与 LangGraph 对齐，
-V2 若需要分支/并行图可平滑迁移（见《项目代码架构.md》）。
+V1 uses a home-grown engine (zero extra dependencies, fully controllable behavior); the interface is aligned with LangGraph,
+so V2 can migrate smoothly if branching/parallel graphs are needed (see "Project Code Architecture.md").
 
-关键语义：
-- 每步执行后立即写 Checkpoint（状态快照），崩溃/重启后从最后检查点恢复，已付费的 LLM 结果不重做。
-- 步骤耗时写入 step_stats（EMA），驱动进度条与 ETA。
-- 步骤可抛 NeedApproval（高危操作 → 审批队列挂起）、引擎捕获 BudgetExceeded（→ 挂起）。
-- state["artifacts"] 是"验证伪影"：既是 Web 流水线视图的进度证据，也是重跑核验点。
+Key semantics:
+- After each step, a Checkpoint (state snapshot) is written immediately; after a crash/restart, execution resumes from the last checkpoint and already-paid-for LLM results are not redone.
+- Step durations are written to step_stats (EMA), driving the progress bar and ETA.
+- A step may raise NeedApproval (high-risk operation → suspend into the approval queue); the engine catches BudgetExceeded (→ suspend).
+- state["artifacts"] is a "verification artifact": it serves both as progress evidence for the Web pipeline view and as a re-run verification point.
 """
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ class TaskFailed(Exception):
 class StepDef:
     name: str
     fn: Callable[["TaskContext", dict], dict]
-    default_duration: float = 20.0  # 无历史数据时的耗时假设（秒）
+    default_duration: float = 20.0  # assumed duration when there is no historical data (seconds)
 
 
 @dataclass
@@ -49,29 +49,29 @@ class TaskContext:
     db: Session
     task: Task
     state: dict = field(default_factory=dict)
-    # 步内进度插值基准（由引擎在每步开始时写入）：整体进度 = base + span*本步完成比例
-    _prog_base: float = 0.0        # 本步开始时的整体进度（0..1）
-    _prog_span: float = 0.0        # 本步在整体中占的进度份额（0..1）
-    _prog_step_dur: float = 0.0    # 本步预估耗时（秒），用于步内 ETA 递减
-    _prog_after: float = 0.0       # 本步之后所有步骤的预估耗时之和（秒）
+    # Intra-step progress interpolation baseline (written by the engine at the start of each step): overall progress = base + span * this step's completion fraction
+    _prog_base: float = 0.0        # overall progress at the start of this step (0..1)
+    _prog_span: float = 0.0        # this step's share of overall progress (0..1)
+    _prog_step_dur: float = 0.0    # estimated duration of this step (seconds), used for intra-step ETA countdown
+    _prog_after: float = 0.0       # sum of estimated durations of all steps after this one (seconds)
 
     def artifact(self, name: str, content: str) -> None:
-        """产出一个验证伪影（清单/摘要/文件列表），流水线视图可见。"""
+        """Produce a verification artifact (manifest/summary/file list), visible in the pipeline view."""
         self.state.setdefault("artifacts", []).append(
             {"step": self.state.get("_current_step", ""), "name": name,
              "content": content[:8000], "ts": time.time()}
         )
 
     def report_progress(self, fraction: float, **extra) -> None:
-        """步骤内部报告完成比例（0..1），驱动进度条在长步骤（如逐篇总结）内平滑前进。
+        """Report the completion fraction (0..1) from inside a step, driving the progress bar to advance smoothly within long steps (e.g. per-item summarization).
 
-        长步骤若不上报，进度条会在其整个执行期间冻结；这里按插值基准算出整体进度
-        并持久化（短提交释放写锁），前端列表页直接用事件、详情页重拉时读到最新值。"""
+        If a long step doesn't report, the progress bar freezes for its entire execution; here we compute overall progress
+        from the interpolation baseline and persist it (a short commit releases the write lock), so the front-end list page uses events directly and the detail page reads the latest value on refetch."""
         fraction = max(0.0, min(1.0, fraction))
         overall = round(self._prog_base + self._prog_span * fraction, 4)
         self.task.progress = overall
         self.task.eta_ts = time.time() + (1.0 - fraction) * self._prog_step_dur + self._prog_after
-        self.db.commit()  # 落库并释放写锁；符合"网络调用之间不持锁"约定
+        self.db.commit()  # persist and release the write lock; honors the "no lock held across network calls" convention
         bus.publish("task_progress", {"task_id": self.task.id, "progress": overall,
                                       "eta_ts": self.task.eta_ts, **extra})
 
@@ -79,7 +79,7 @@ class TaskContext:
         bus.publish("task_progress", {"task_id": self.task.id, **data})
 
     def require_approval(self, desc: str, risk: str = "high") -> None:
-        """高危操作前调用：已批准则通过，否则挂起进审批队列。"""
+        """Call before a high-risk operation: pass if already approved, otherwise suspend into the approval queue."""
         approval_id = self.state.get("_approval_ids", {}).get(desc)
         if approval_id:
             row = self.db.execute(select(Approval).where(Approval.id == approval_id)).scalar_one_or_none()
@@ -90,7 +90,7 @@ class TaskContext:
         raise NeedApproval(desc, risk)
 
 
-# ---- 任务图注册表 ----
+# ---- Task graph registry ----
 REGISTRY: dict[str, list[StepDef]] = {}
 
 
@@ -98,7 +98,7 @@ def register(task_type: str, steps: list[StepDef]) -> None:
     REGISTRY[task_type] = steps
 
 
-# ---- step_stats（EMA）与 ETA ----
+# ---- step_stats (EMA) and ETA ----
 def _stat_id(task_type: str, step: str) -> str:
     return f"{task_type}:{step}"
 
@@ -108,7 +108,7 @@ def _record_duration(db: Session, task_type: str, step: str, seconds: float) -> 
     row = db.execute(select(StepStat).where(StepStat.id == sid)).scalar_one_or_none()
     if row is None:
         db.add(StepStat(id=sid, duration_p50=seconds, duration_p90=seconds * 1.5, sample_count=1))
-    else:  # 指数移动平均近似分位数
+    else:  # exponential moving average approximating quantiles
         row.duration_p50 = 0.7 * row.duration_p50 + 0.3 * seconds
         row.duration_p90 = max(0.8 * row.duration_p90, seconds)
         row.sample_count += 1
@@ -130,7 +130,7 @@ def _update_progress(db: Session, task: Task, steps: list[StepDef], next_index: 
     task.progress = round(done / total, 4)
     remaining = sum(durations[next_index:])
     task.eta_ts = time.time() + remaining if next_index < len(steps) else 0
-    if ctx is not None and next_index < len(steps):  # 记录步内进度插值基准
+    if ctx is not None and next_index < len(steps):  # record the intra-step progress interpolation baseline
         ctx._prog_base = task.progress
         ctx._prog_span = durations[next_index] / total
         ctx._prog_step_dur = durations[next_index]
@@ -143,7 +143,7 @@ def _update_progress(db: Session, task: Task, steps: list[StepDef], next_index: 
 
 
 def latest_checkpoint(db: Session, task_id: str) -> Checkpoint | None:
-    """取最新快照：同一 step_index 可能有多个（如失败重试保存的状态），以时间最新者为准。"""
+    """Get the latest snapshot: the same step_index may have several (e.g. state saved on a failed retry); the most recent one wins."""
     return db.execute(
         select(Checkpoint).where(Checkpoint.task_id == task_id)
         .order_by(Checkpoint.step_index.desc(), Checkpoint.created_at.desc())
@@ -151,7 +151,7 @@ def latest_checkpoint(db: Session, task_id: str) -> Checkpoint | None:
 
 
 def run_task(db: Session, task: Task) -> None:
-    """执行任务：从最后一个检查点续跑。由调度器工作线程调用。"""
+    """Execute a task: resume from the last checkpoint. Called by the scheduler worker thread."""
     steps = REGISTRY.get(task.type)
     if not steps:
         task.status = "FAILED"
@@ -172,8 +172,8 @@ def run_task(db: Session, task: Task) -> None:
     for i in range(start_index, len(steps)):
         step = steps[i]
         state["_current_step"] = step.name
-        _update_progress(db, task, steps, i, ctx)  # 同时记录步内进度插值基准
-        db.commit()  # 进度先落库：①不留脏数据给步内 autoflush 拿锁 ②进度条对 API 即时可见
+        _update_progress(db, task, steps, i, ctx)  # also records the intra-step progress interpolation baseline
+        db.commit()  # persist progress first: (1) leave no dirty data for an intra-step autoflush to grab the lock (2) make the progress bar immediately visible to the API
         t0 = time.time()
         try:
             new_state = step.fn(ctx, state)
@@ -184,7 +184,7 @@ def run_task(db: Session, task: Task) -> None:
             db.add(approval)
             db.flush()
             state.setdefault("_approval_ids", {})[e.desc] = approval.id
-            _save_checkpoint(db, task, i - 1, state)  # 审批通过后从本步重跑
+            _save_checkpoint(db, task, i - 1, state)  # after approval, re-run from this step
             task.status = "WAITING_APPROVAL"
             bus.publish("approval_needed", {"task_id": task.id, "desc": e.desc, "approval_id": approval.id})
             return
@@ -200,7 +200,7 @@ def run_task(db: Session, task: Task) -> None:
             task.finished_at = time.time()
             bus.publish("task_failed", {"task_id": task.id, "error": str(e)})
             return
-        except Exception as e:  # noqa: BLE001  未知错误：保留检查点，标记失败可重跑
+        except Exception as e:  # noqa: BLE001  unknown error: keep the checkpoint, mark as failed and re-runnable
             _save_checkpoint(db, task, i - 1, state)
             task.status = "FAILED"
             task.error = f"{type(e).__name__}: {e}\n{traceback.format_exc()[-1500:]}"
@@ -210,8 +210,8 @@ def run_task(db: Session, task: Task) -> None:
 
         _record_duration(db, task.type, step.name, time.time() - t0)
         _save_checkpoint(db, task, i, state)
-        db.commit()  # 每步提交：释放 SQLite 写锁，让下一步的 LLM/网络调用期间不占锁；
-        #             同时让 artifacts/审计/检查点对 API 读连接（WAL 快照）即时可见。
+        db.commit()  # commit per step: release the SQLite write lock so the next step's LLM/network calls don't hold it;
+        #             also make artifacts/audit/checkpoints immediately visible to the API read connection (WAL snapshot).
 
     task.status = "DONE"
     task.progress = 1.0
@@ -223,7 +223,7 @@ def run_task(db: Session, task: Task) -> None:
 
 def _save_checkpoint(db: Session, task: Task, step_index: int, state: dict) -> None:
     if step_index < 0:
-        step_index = -1  # 尚未完成任何步骤，但需要保存审批等状态
+        step_index = -1  # no step completed yet, but we still need to save state such as approvals
     steps = REGISTRY[task.type]
     name = steps[step_index].name if 0 <= step_index < len(steps) else "(init)"
     db.add(Checkpoint(task_id=task.id, step_index=step_index, step_name=name,

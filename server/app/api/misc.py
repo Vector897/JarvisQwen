@@ -1,4 +1,4 @@
-"""订阅 / 知识库 / 简报 / 审批 / 审计 / 设置 / 仪表盘——轻量 CRUD 集合。"""
+"""Subscriptions / library / briefings / approvals / audit / settings / dashboard — a collection of lightweight CRUD endpoints."""
 from __future__ import annotations
 
 import time
@@ -22,7 +22,7 @@ from ..models import (Approval, AuditLog, Briefing, Paper, Subscription, Summary
 router = APIRouter(prefix="/api", tags=["misc"])
 
 
-# ---------- 订阅 ----------
+# ---------- Subscriptions ----------
 class SubIn(BaseModel):
     query: str
     interval_minutes: int = 360
@@ -63,13 +63,13 @@ def delete_sub(sub_id: str, user: User = Depends(current_user), db: Session = De
     return {"ok": True}
 
 
-# ---------- 知识库 ----------
+# ---------- Library ----------
 @router.get("/library")
 def library(q: str = "", limit: int = 50,
             user: User = Depends(current_user), db: Session = Depends(get_db)):
     stmt = select(Paper).order_by(Paper.created_at.desc()).limit(limit)
     if user.role != "admin":
-        stmt = stmt.where(Paper.owner_id == user.id)  # AFR：检索前权限过滤
+        stmt = stmt.where(Paper.owner_id == user.id)  # AFR: permission filtering before retrieval
     if q:
         stmt = stmt.where(Paper.title.like(f"%{q}%") | Paper.abstract.like(f"%{q}%"))
     papers = db.execute(stmt).scalars().all()
@@ -83,7 +83,7 @@ def library(q: str = "", limit: int = 50,
     return out
 
 
-# ---------- 简报 ----------
+# ---------- Briefings ----------
 @router.get("/briefings")
 def briefings(limit: int = 14, user: User = Depends(current_user), db: Session = Depends(get_db)):
     q = select(Briefing).order_by(Briefing.created_at.desc()).limit(limit)
@@ -93,10 +93,10 @@ def briefings(limit: int = 14, user: User = Depends(current_user), db: Session =
             for b in db.execute(q).scalars()]
 
 
-# ---------- 审批（HITL）----------
+# ---------- Approvals (HITL) ----------
 @router.get("/approvals")
 def approvals(user: User = Depends(current_user), db: Session = Depends(get_db)):
-    # 只列出自己任务的待审批项（admin 看全部）：审批决定会重启任务，不能跨用户操作
+    # Only list pending approvals for the user's own tasks (admin sees all): an approval decision restarts the task, so it must not act across users
     q = (select(Approval).join(Task, Approval.task_id == Task.id)
          .where(Approval.status == "pending").order_by(Approval.created_at.desc()))
     if user.role != "admin":
@@ -120,17 +120,17 @@ def decide(approval_id: str, decision: str,
     a.status = "approved" if decision == "approve" else "rejected"
     a.decided_by = user.id
     if task and task.status == "WAITING_APPROVAL":
-        task.status = "QUEUED"  # 从检查点无缝继续（拒绝的情况由 require_approval 抛 TaskFailed）
+        task.status = "QUEUED"  # seamlessly resume from the checkpoint (the reject case is handled by require_approval raising TaskFailed)
     return {"ok": True, "status": a.status}
 
 
-# ---------- 审计 ----------
+# ---------- Audit ----------
 @router.get("/audit")
 def audit(task_id: str = "", limit: int = 100,
           user: User = Depends(current_user), db: Session = Depends(get_db)):
     q = select(AuditLog).order_by(AuditLog.ts.desc()).limit(limit)
     if task_id:
-        # 指定任务：非 admin 需拥有该任务，否则不返回其审计（prompt/输出摘要属敏感）
+        # Specific task: a non-admin must own the task, otherwise its audit is not returned (prompt/output digests are sensitive)
         if user.role != "admin":
             owned = db.execute(select(Task.id).where(
                 Task.id == task_id, Task.owner_id == user.id)).first()
@@ -138,7 +138,7 @@ def audit(task_id: str = "", limit: int = 100,
                 raise HTTPException(403, "Not allowed to view this task's audit log")
         q = q.where(AuditLog.task_id == task_id)
     elif user.role != "admin":
-        # 未指定任务：非 admin 只能看自己任务产生的审计（系统级 task_id="" 记录仅 admin 可见）
+        # No task specified: a non-admin can only see audit records from their own tasks (system-level task_id="" records are admin-only)
         q = q.where(AuditLog.task_id.in_(select(Task.id).where(Task.owner_id == user.id)))
     return [{"id": r.id, "task_id": r.task_id, "step": r.step, "model": r.model,
              "tokens_in": r.tokens_in, "tokens_out": r.tokens_out,
@@ -148,7 +148,7 @@ def audit(task_id: str = "", limit: int = 100,
             for r in db.execute(q).scalars()]
 
 
-# ---------- 设置 ----------
+# ---------- Settings ----------
 @router.get("/settings")
 def read_settings(user: User = Depends(current_user), db: Session = Depends(get_db)):
     return all_settings(db, mask_secrets=True)
@@ -166,14 +166,14 @@ def write_settings(body: SettingsIn, user: User = Depends(require_admin),
         raise HTTPException(400, f"Unknown settings: {unknown}")
     for k, v in body.values.items():
         if k in SECRET_KEYS and not str(v).strip():
-            continue  # 密钥字段留空 = 不修改既有值
+            continue  # an empty secret field = leave the existing value unchanged
         set_setting(db, k, v)
     return {"ok": True}
 
 
 @router.get("/telegram/bot")
 def telegram_bot_info(user: User = Depends(current_user), db: Session = Depends(get_db)):
-    """/connect 页二维码所需的 bot 配置状态与用户名。"""
+    """Bot configuration status and username needed for the QR code on the /connect page."""
     from ..connectors.telegram_bot import bot_info
     return bot_info(db)
 
@@ -186,7 +186,7 @@ def test_notify(user: User = Depends(require_admin), db: Session = Depends(get_d
     return {"results": results}
 
 
-# ---------- 导出 ----------
+# ---------- Export ----------
 @router.get("/briefings/{briefing_id}/export")
 def export_briefing(briefing_id: str, fmt: str = "md",
                     user: User = Depends(current_user), db: Session = Depends(get_db)):
@@ -220,7 +220,7 @@ def export_library(fmt: str = "bibtex", user: User = Depends(current_user), db: 
     raise HTTPException(400, "Only fmt=bibtex is supported for now")
 
 
-# ---------- Zotero 同步 ----------
+# ---------- Zotero sync ----------
 @router.post("/library/{paper_id}/zotero-sync")
 def zotero_sync_one(paper_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
     p = db.execute(select(Paper).where(Paper.id == paper_id)).scalar_one_or_none()
@@ -233,7 +233,7 @@ def zotero_sync_one(paper_id: str, user: User = Depends(current_user), db: Sessi
     return {"ok": True, "message": msg}
 
 
-# ---------- 跨库问答（library_qa，paper-qa 思想的轻量实现）----------
+# ---------- Cross-library QA (library_qa, a lightweight implementation of the paper-qa idea) ----------
 class QaIn(BaseModel):
     question: str
 
@@ -244,7 +244,7 @@ def library_qa(body: QaIn, user: User = Depends(current_user), db: Session = Dep
         raise HTTPException(400, "Question cannot be empty")
     stmt = select(Paper).order_by(Paper.created_at.desc()).limit(200)
     if user.role != "admin":
-        stmt = stmt.where(Paper.owner_id == user.id)  # AFR：先过滤再检索
+        stmt = stmt.where(Paper.owner_id == user.id)  # AFR: filter first, then retrieve
     papers = db.execute(stmt).scalars().all()
     if not papers:
         return {"answer": "The library is empty — no papers to search yet.", "cited": [], "escalated": False}
@@ -278,7 +278,7 @@ def library_qa(body: QaIn, user: User = Depends(current_user), db: Session = Dep
             "cited": [{"id": p.id, "title": p.title, "url": p.url} for _, p, _ in top]}
 
 
-# ---------- 成本分析 ----------
+# ---------- Cost analysis ----------
 @router.get("/dashboard/costs")
 def dashboard_costs(days: int = 7, user: User = Depends(current_user), db: Session = Depends(get_db)):
     days = max(1, min(days, 30))
@@ -289,9 +289,9 @@ def dashboard_costs(days: int = 7, user: User = Depends(current_user), db: Sessi
     for r in rows:
         day = time.strftime("%m-%d", time.localtime(r.ts))
         daily[day] = daily.get(day, 0) + r.cost_usd
-        model_key = r.model.split("::")[-1] if r.model else "(其他)"
+        model_key = r.model.split("::")[-1] if r.model else "(other)"
         by_model[model_key] = by_model.get(model_key, 0) + r.cost_usd
-    # 补齐没有花费的日期，保证图表连续
+    # Fill in days with no spend so the chart stays continuous
     ordered_days = []
     for i in range(days - 1, -1, -1):
         day = time.strftime("%m-%d", time.localtime(time.time() - i * 86400))
@@ -303,7 +303,7 @@ def dashboard_costs(days: int = 7, user: User = Depends(current_user), db: Sessi
     return {"daily": ordered_days, "by_model": model_breakdown}
 
 
-# ---------- 仪表盘 ----------
+# ---------- Dashboard ----------
 @router.get("/dashboard")
 def dashboard(user: User = Depends(current_user), db: Session = Depends(get_db)):
     spent = today_spend(db)

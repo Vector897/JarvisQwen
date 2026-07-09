@@ -1,4 +1,4 @@
-"""SSE 事件流：任务进度、ETA 更新、预算告警、简报推送、审批通知。"""
+"""SSE event stream: task progress, ETA updates, budget alerts, briefing pushes, approval notifications."""
 from __future__ import annotations
 
 import asyncio
@@ -26,7 +26,7 @@ async def events(user: User = Depends(current_user)):
                     msg = await asyncio.to_thread(q.get, True, 25)
                     yield EventBus.sse_format(msg)
                 except queue.Empty:
-                    yield ": keepalive\n\n"  # 心跳防反代超时
+                    yield ": keepalive\n\n"  # heartbeat to prevent reverse-proxy timeout
         finally:
             bus.unsubscribe(q)
 

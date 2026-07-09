@@ -1,12 +1,15 @@
-"""可选访问码网关（公网演示用）。
+"""Optional access-code gateway (for public demos).
 
-设置环境变量 AAOS_ACCESS_CODE 后，所有 /api 请求必须携带该码，否则 401：
-  - Cookie: aaos_access=<code>（前端从 ?k=<code> 魔法链接自动写入）
-  - 或查询串 ?k=<code>
-  - 或请求头 X-Access-Code: <code>
-不设置（默认空）则完全开放，不影响本地开发。纯 ASGI 中间件，不影响 SSE。
+When the AAOS_ACCESS_CODE environment variable is set, every /api request must
+carry the code or it gets a 401:
+  - Cookie: aaos_access=<code> (written automatically by the frontend from the ?k=<code> magic link)
+  - or query string ?k=<code>
+  - or request header X-Access-Code: <code>
+When unset (empty by default) it is fully open and does not affect local development.
+Pure ASGI middleware, so it does not interfere with SSE.
 
-这是防"陌生人烧你的 Key 额度"的真正闸门；入站限流只负责防洪水打爆机器。
+This is the real gate that stops "strangers burning your key quota"; inbound rate
+limiting only guards against floods overwhelming the machine.
 """
 from __future__ import annotations
 
@@ -18,10 +21,10 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 def _provided_code(scope: Scope) -> str:
     headers = {k: v for k, v in (scope.get("headers") or [])}
-    # 1) X-Access-Code 头
+    # 1) X-Access-Code header
     if b"x-access-code" in headers:
         return headers[b"x-access-code"].decode("latin-1").strip()
-    # 2) ?k= 查询串
+    # 2) ?k= query string
     qs = parse_qs((scope.get("query_string") or b"").decode("latin-1"))
     if qs.get("k"):
         return qs["k"][0].strip()
@@ -35,7 +38,7 @@ def _provided_code(scope: Scope) -> str:
 
 
 class AccessGateMiddleware:
-    """AAOS_ACCESS_CODE 非空时，未带正确码的 /api 请求一律 401。"""
+    """When AAOS_ACCESS_CODE is non-empty, any /api request without the correct code gets a 401."""
 
     def __init__(self, app: ASGIApp, code: str,
                  exempt_prefixes: tuple[str, ...] = ("/healthz",)) -> None:

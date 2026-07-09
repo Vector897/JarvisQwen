@@ -1,5 +1,5 @@
-"""全链路冒烟：lifespan 启动（调度器+admin 创建）→ 登录 → 下任务 → 轮询完成 → 校验流水线与审计。
-运行：python tests/smoke_e2e.py
+"""End-to-end smoke test: lifespan startup (scheduler + admin creation) → login → submit task → poll to completion → verify pipeline and audit.
+Run: python tests/smoke_e2e.py
 """
 from __future__ import annotations
 

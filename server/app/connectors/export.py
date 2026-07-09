@@ -1,5 +1,6 @@
-"""导出：Markdown（始终可用）、BibTeX（Zotero/其他文献管理器可直接导入）、
-PDF（可选依赖 reportlab；未安装则调用方应捕获 ImportError 并提示）。
+"""Export: Markdown (always available), BibTeX (importable directly into Zotero/other
+reference managers), PDF (optional dependency reportlab; if not installed, the caller
+should catch ImportError and prompt accordingly).
 """
 from __future__ import annotations
 
@@ -28,7 +29,7 @@ def to_bibtex(papers: list[dict]) -> str:
 
 
 def markdown_to_pdf_bytes(title: str, markdown_text: str) -> bytes:
-    """极简 Markdown → PDF（reportlab，纯 Python 无需系统依赖）。未安装时抛 ImportError。"""
+    """Minimal Markdown → PDF (reportlab, pure Python, no system dependencies). Raises ImportError if not installed."""
     from reportlab.lib.pagesizes import A4  # type: ignore
     from reportlab.lib.styles import getSampleStyleSheet  # type: ignore
     from reportlab.lib.units import cm  # type: ignore

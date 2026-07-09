@@ -3,10 +3,10 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
 /**
- * 轻量 i18n：覆盖全部界面文案（导航、按钮、标题、空状态、表单标签、Toast 提示）。
- * 范围边界：后端返回的动态内容本身——任务标题、审计摘要、简报正文、AI 回答——
- * 是模型生成的中文语义内容，不在此翻译范围（那是数据，不是界面文案）。
- * 使用指南页（/help）为长文档，采用页内 L(en, zh) 双语对照，不走本字典。
+ * Lightweight i18n: covers all UI copy (navigation, buttons, titles, empty states, form labels, toast messages).
+ * Scope boundary: dynamic content returned by the backend — task titles, audit digests, briefing bodies, AI answers —
+ * is model-generated semantic content and is out of scope here (that's data, not UI copy).
+ * The guidelines page (/help) is a long document that uses in-page L(en, zh) bilingual pairs rather than this dictionary.
  */
 
 const DICT = {

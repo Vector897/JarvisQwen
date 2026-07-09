@@ -1,4 +1,4 @@
-"""三档新增功能单测：语义缓存相似度、级联置信度启发式、导出、任务模板、记忆仲裁。"""
+"""Unit tests for the three-tier new features: semantic cache similarity, cascade confidence heuristic, export, task templates, memory arbitration."""
 from __future__ import annotations
 
 import os
@@ -24,12 +24,12 @@ def test_semantic_cache_exact_and_similar_hit():
     init_db()
     with session() as db:
         semantic.store(db, "light", "总结一下这篇关于强化学习的论文", "这是总结内容", "gemini/flash")
-        # 精确匹配
+        # exact match
         assert semantic.lookup(db, "light", "总结一下这篇关于强化学习的论文") == "这是总结内容"
-        # 语义相似（词序/标点变化但核心词一致）应命中
+        # semantically similar (word order/punctuation varies but core terms match) should hit
         hit = semantic.lookup(db, "light", "总结 一下 这篇 关于 强化学习 的 论文！")
         assert hit == "这是总结内容"
-        # 完全不相关应不命中
+        # completely unrelated should not hit
         assert semantic.lookup(db, "light", "今天天气怎么样") is None
 
 
@@ -69,7 +69,7 @@ def test_memory_arbitration_reconciles_conflict():
         db.flush()
         uid = user.id
 
-    # consolidate 依赖 LLM 调用（dry-run 无 Key 时返回模拟响应），只验证不抛异常、流程可跑通
+    # consolidate depends on an LLM call (returns a simulated response on dry-run with no Key); only verify it doesn't raise and the flow runs through
     with session() as db:
         count = consolidate(db, uid)
-        assert count >= 0  # dry-run 下情节记忆不足 3 条会提前返回 0，属预期
+        assert count >= 0  # on dry-run, fewer than 3 episodic memories returns 0 early, which is expected

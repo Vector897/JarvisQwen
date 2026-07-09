@@ -1,6 +1,6 @@
-"""外部推送：Telegram / 邮件（SMTP）。简报生成完成、预算熔断时触发。
+"""External push notifications: Telegram / email (SMTP). Triggered when a briefing finishes generating or the budget cuts off.
 
-失败静默降级（推送不是关键路径，不应让任务失败）。
+Failures degrade silently (push is not on the critical path and should not fail the task).
 """
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ def push_email(db: Session, subject: str, body: str) -> tuple[bool, str]:
 
 
 def notify_all(db: Session, subject: str, text: str) -> list[str]:
-    """按已启用的渠道推送，返回结果消息列表（供审计/调试）。"""
+    """Push through the enabled channels, returning a list of result messages (for audit/debug)."""
     results = []
     if get_setting(db, "notify_telegram_enabled"):
         ok, msg = push_telegram(db, f"*{subject}*\n\n{text}")

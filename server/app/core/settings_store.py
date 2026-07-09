@@ -1,4 +1,4 @@
-"""业务级配置（settings 表）读写，Web 端改完即热生效。"""
+"""Read/write for business-level configuration (settings table); changes from the web UI take effect immediately (hot reload)."""
 from __future__ import annotations
 
 import json
@@ -12,26 +12,26 @@ from ..models import Setting
 
 DEFAULTS: dict[str, Any] = {
     "daily_budget_usd": config.daily_budget_usd,
-    "redact_level": "medium",  # low/medium/high；high=验证模式直接阻断
+    "redact_level": "medium",  # low/medium/high; high = validation mode, blocks outright
     "cache_enabled": True,
     "cache_ttl_hours": 72,
-    "briefing_hour": 7,  # 每天几点生成简报
-    "consolidate_hour": 3,  # 记忆整合时间
-    # 三级路由的模型选择——默认 Qwen 全家桶：规则层 $0 → flash 初筛 → max 深度总结
+    "briefing_hour": 7,  # hour of day to generate the briefing
+    "consolidate_hour": 3,  # memory consolidation time
+    # Model selection for three-tier routing — defaults to the full Qwen lineup: rules tier $0 → flash first-pass screening → max deep summarization
     "model_light": "qwen/qwen3.6-flash",
     "model_light_fallbacks": ["qwen/qwen3.7-plus"],
     "model_frontier": "qwen/qwen3.7-max",
     "model_frontier_fallbacks": ["qwen/qwen3.7-plus"],
     "max_retries": 3,
-    "relevance_threshold": 0.5,  # 论文初筛相关度阈值
-    "research_profile": "",  # 用户研究方向描述，用于初筛与总结的上下文
+    "relevance_threshold": 0.5,  # relevance threshold for first-pass paper screening
+    "research_profile": "",  # description of the user's research direction, used as context for screening and summarization
     "cascade_enabled": True,
     "cascade_confidence_threshold": 0.6,
-    # 推送通知
+    # Push notifications
     "notify_telegram_enabled": False,
     "telegram_bot_token": "",
     "telegram_chat_id": "",
-    "telegram_update_offset": 0,  # 遥控轮询的 getUpdates 游标
+    "telegram_update_offset": 0,  # getUpdates cursor for remote-control polling
     "notify_email_enabled": False,
     "smtp_host": "",
     "smtp_port": 587,
@@ -40,16 +40,16 @@ DEFAULTS: dict[str, Any] = {
     "smtp_from": "",
     "smtp_to": "",
     "notify_on_budget_cutoff": True,
-    # Zotero 同步
+    # Zotero sync
     "zotero_api_key": "",
     "zotero_library_id": "",
     "zotero_library_type": "user",
-    # 界面
-    "ui_theme": "light",  # light/dark（也存一份在 localStorage，这里做跨设备记忆）
+    # UI
+    "ui_theme": "light",  # light/dark (also stored in localStorage; this copy provides cross-device persistence)
     "ui_lang": "en",  # en/zh
 }
 
-SECRET_KEYS = {  # 这些 key 在 GET /api/settings 中掩码返回，避免明文泄露给前端
+SECRET_KEYS = {  # these keys are masked in GET /api/settings to avoid leaking plaintext to the frontend
     "telegram_bot_token", "smtp_password", "zotero_api_key",
 }
 
@@ -77,8 +77,8 @@ def all_settings(db: Session, mask_secrets: bool = False) -> dict[str, Any]:
         except json.JSONDecodeError:
             pass
     if mask_secrets:
-        # 密钥字段不回显明文：置空 + 附带 "<key>_is_set" 布尔位。
-        # 前端：字段留空提交 = 不改动既有密钥（PUT 时跳过空的 secret 字段）。
+        # Secret fields are not echoed in plaintext: cleared + accompanied by a "<key>_is_set" boolean flag.
+        # Frontend: submitting a field left empty = leave the existing secret unchanged (PUT skips empty secret fields).
         for key in SECRET_KEYS:
             merged[f"{key}_is_set"] = bool(merged.get(key))
             merged[key] = ""

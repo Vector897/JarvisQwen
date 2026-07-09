@@ -92,7 +92,7 @@ export default function Dashboard() {
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* 最近 LLM 调用 */}
+        {/* Recent LLM calls */}
         <div className="card overflow-x-auto">
           <div className="mb-2 flex items-center justify-between text-sm">
             <span className="font-medium">{lang === "zh" ? "最近 LLM 调用" : "Recent LLM calls"}</span>
@@ -131,7 +131,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Qwen 三级路由价目 */}
+        {/* Qwen three-tier routing price list */}
         <div className="card overflow-x-auto">
           <div className="mb-2 text-sm font-medium">
             {lang === "zh" ? "三级路由 · Qwen 全家桶价目" : "Tiered routing · the Qwen family"}
@@ -169,8 +169,9 @@ export default function Dashboard() {
 
 function Stat({ label, value, href }: { label: string; value: number; href: string }) {
   return (
-    // @container：数字大小按卡片自身可用宽度（cqi）流体缩放，而非全局视口断点——
-    // 同一个 Stat 组件放进 2 列或 4 列布局都会自适应，不需要写死 text-2xl/text-lg 断点判断。
+    // @container: the number size scales fluidly against the card's own available width (cqi)
+    // rather than global viewport breakpoints — so the same Stat component adapts whether it sits
+    // in a 2-column or 4-column layout, with no hard-coded text-2xl/text-lg breakpoint logic.
     <Link href={href} className="card-link @container">
       <div className="font-bold" style={{ fontSize: "clamp(1.25rem, 12cqi, 1.75rem)" }}>{value}</div>
       <div className="text-xs text-content-muted">{label}</div>

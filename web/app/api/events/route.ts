@@ -1,9 +1,11 @@
-// SSE 专用流式反代：绕过 next.config 里 rewrites() 对流式响应的缓冲。
+// SSE-specific streaming reverse proxy: bypasses the buffering that rewrites() in next.config
+// applies to streaming responses.
 //
-// 通用的 /api/:path* rewrite 会把 SSE 响应攒在代理层不实时下发（表现为
-// 前端只有手动刷新才更新状态）。App Router 的路由处理器优先级高于数组形式
-// 的 rewrite（afterFiles 阶段），因此这里单独接管 /api/events，把后端的
-// ReadableStream 原样透传；其余 /api/* 仍走 next.config 的 rewrite。
+// The generic /api/:path* rewrite buffers the SSE response at the proxy layer instead of
+// delivering it in real time (manifesting as the frontend only updating state on a manual
+// refresh). App Router route handlers take precedence over array-form rewrites (the afterFiles
+// stage), so here we handle /api/events separately, passing the backend's ReadableStream
+// through as-is; the rest of /api/* still goes through next.config's rewrite.
 import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
@@ -18,7 +20,7 @@ export async function GET(req: NextRequest) {
       cookie: req.headers.get("cookie") || "",
       accept: "text/event-stream",
     },
-    // 客户端断开 → 中止上游请求，触发后端 finally: bus.unsubscribe，避免订阅者泄漏
+    // Client disconnect → abort the upstream request, triggering the backend's finally: bus.unsubscribe, avoiding subscriber leaks
     signal: req.signal,
     cache: "no-store",
   });
@@ -29,7 +31,7 @@ export async function GET(req: NextRequest) {
       "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
-      "X-Accel-Buffering": "no", // 反代（nginx）也不缓冲
+      "X-Accel-Buffering": "no", // Tell the reverse proxy (nginx) not to buffer either
     },
   });
 }

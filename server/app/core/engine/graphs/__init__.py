@@ -1,2 +1,2 @@
-"""导入即注册全部任务图。"""
+"""Importing registers all task graphs."""
 from . import arxiv_watch, briefing, echo  # noqa: F401

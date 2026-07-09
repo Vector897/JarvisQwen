@@ -1,6 +1,6 @@
 "use client";
 
-/** 轻量自绘 SVG 柱状图/条形图，不引入额外图表库依赖。 */
+/** Lightweight hand-drawn SVG column/bar charts, with no extra charting-library dependency. */
 
 export function BarChart({ data, height = 140 }: { data: { date: string; cost_usd: number }[]; height?: number }) {
   const max = Math.max(...data.map((d) => d.cost_usd), 0.001);

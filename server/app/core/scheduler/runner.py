@@ -1,4 +1,4 @@
-"""调度器：工作线程轮询队列（租约防双消费）+ 看门狗 + 订阅触发 + 夜间维护。"""
+"""Scheduler: worker threads polling the queue (leases prevent double consumption) + watchdog + subscription triggers + nightly maintenance."""
 from __future__ import annotations
 
 import json
@@ -15,14 +15,14 @@ from ..bus import bus
 from ..engine.engine import run_task
 from ..settings_store import get_setting
 
-LEASE_SECONDS = 30 * 60  # 单任务租约上限（看门狗依据）
-WORKERS = int(os.environ.get("AAOS_WORKERS", "3"))  # 并发工作线程数：任务多为 LLM 网络等待，多线程可并行
+LEASE_SECONDS = 30 * 60  # per-task lease cap (basis for the watchdog)
+WORKERS = int(os.environ.get("AAOS_WORKERS", "3"))  # concurrent worker count: tasks are mostly LLM network waits, so multithreading parallelizes well
 _stop = threading.Event()
-_claim_lock = threading.Lock()  # 多 worker 同进程，用线程锁保证"查询+写租约"原子，防双消费
+_claim_lock = threading.Lock()  # multiple workers in one process; a thread lock keeps "query + write lease" atomic to prevent double consumption
 
 
 def _claim_next() -> str | None:
-    """领取一个排队任务（写租约），返回 task_id。"""
+    """Claim a queued task (write the lease), returning task_id."""
     with _claim_lock, session() as db:
         task = db.execute(
             select(Task).where(Task.status == "QUEUED")
@@ -49,7 +49,7 @@ def worker_loop() -> None:
             with session() as db:
                 task = db.execute(select(Task).where(Task.id == task_id)).scalar_one()
                 run_task(db, task)
-        except Exception:  # noqa: BLE001  引擎内部已兜底，这里防调度器线程死亡
+        except Exception:  # noqa: BLE001  the engine already handles this internally; this guards against the scheduler thread dying
             traceback.print_exc()
             with session() as db:
                 task = db.execute(select(Task).where(Task.id == task_id)).scalar_one_or_none()
@@ -59,19 +59,19 @@ def worker_loop() -> None:
 
 
 def watchdog() -> None:
-    """租约过期的 RUNNING 任务 → ZOMBIE 回收 → 重新排队（从检查点续跑）。"""
+    """RUNNING tasks with an expired lease → reclaim as ZOMBIE → re-queue (resume from checkpoint)."""
     with session() as db:
         rows = db.execute(
             select(Task).where(Task.status == "RUNNING", Task.lease_until < time.time())
         ).scalars().all()
         for t in rows:
-            t.status = "QUEUED"  # 检查点仍在，重跑不重复付费
+            t.status = "QUEUED"  # the checkpoint remains, so rerunning does not pay twice
             t.error = "Watchdog reclaim: execution timed out (zombie); re-queued from checkpoint"
             bus.publish("task_zombie_requeued", {"task_id": t.id})
 
 
 def check_subscriptions() -> None:
-    """到期的订阅 → 派生 arxiv_watch 任务。"""
+    """Due subscriptions → spawn arxiv_watch tasks."""
     with session() as db:
         now = time.time()
         subs = db.execute(select(Subscription).where(Subscription.enabled == 1)).scalars().all()
@@ -108,7 +108,7 @@ def daily_briefing() -> None:
 
 
 def recover_on_boot() -> None:
-    """启动钩子：崩溃前 RUNNING 的任务重新排队（检查点续跑）。"""
+    """Startup hook: re-queue tasks that were RUNNING before a crash (resume from checkpoint)."""
     with session() as db:
         rows = db.execute(select(Task).where(Task.status == "RUNNING")).scalars().all()
         for t in rows:
@@ -116,7 +116,7 @@ def recover_on_boot() -> None:
 
 
 def start(scheduler) -> list[threading.Thread]:
-    """启动工作线程池并注册 APScheduler 定时作业。scheduler: BackgroundScheduler。"""
+    """Start the worker thread pool and register APScheduler jobs. scheduler: BackgroundScheduler."""
     recover_on_boot()
     threads = []
     for i in range(WORKERS):

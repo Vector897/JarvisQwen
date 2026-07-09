@@ -1,4 +1,4 @@
-"""BYOK：Key 录入（自动格式修正+厂商识别+实时探活）、列表（掩码）、删除。"""
+"""BYOK: key onboarding (auto format fixup + provider detection + live probe), listing (masked), deletion."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/keys", tags=["keys"])
 
 class KeyIn(BaseModel):
     raw_key: str
-    provider: str = ""  # 留空则自动识别
+    provider: str = ""  # leave empty to auto-detect
     base_url: str = ""
     label: str = ""
     skip_probe: bool = False

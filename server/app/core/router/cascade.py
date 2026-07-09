@@ -1,8 +1,10 @@
-"""模型级联（AutoMix 思想）：轻量层先答 → 启发式自评置信度 → 不达标才升级前沿层。
+"""Model cascade (AutoMix idea): the light tier answers first → heuristic self-assessed confidence → escalate to the frontier tier only if it falls short.
 
-比起「无脑总是用前沿层」，这让路由层在轻量层已经够用的情况下不多花钱；
-比起「无脑总是用轻量层」，又保证了疑难案例不会给出低质量答案。
-自评用零成本启发式（不额外调用模型），避免「为了省钱又多花一次钱」的悖论。
+Compared to "blindly always use the frontier tier", this keeps the router from
+overspending when the light tier is already good enough; compared to "blindly always
+use the light tier", it ensures hard cases don't get low-quality answers.
+Self-assessment uses a zero-cost heuristic (no extra model call), avoiding the paradox
+of "spending an extra call in order to save money".
 """
 from __future__ import annotations
 
@@ -21,7 +23,7 @@ HEDGE_PATTERNS = re.compile(
 
 
 def _confidence_heuristic(text: str, min_len: int = 20) -> float:
-    """零成本置信度估计：过短、含糊词、明显截断 → 低置信度。"""
+    """Zero-cost confidence estimate: too short, hedging words, or obvious truncation → low confidence."""
     if not text or len(text.strip()) < min_len:
         return 0.2
     score = 1.0
@@ -43,11 +45,11 @@ def complete_cascade(
     max_tokens: int = 2048,
     confidence_threshold: float = 0.6,
 ) -> tuple[llm.LlmResult, bool]:
-    """先用轻量层回答；置信度不足则升级前沿层重做。返回 (结果, 是否发生了升级)。"""
+    """Answer with the light tier first; if confidence is insufficient, escalate to the frontier tier and redo. Returns (result, whether an escalation occurred)."""
     light_result = llm.complete(db, prompt, tier=policy.TIER_LIGHT, task=task,
                                 step=f"{step}_light", max_tokens=max_tokens)
     if light_result.cached or light_result.simulated:
-        return light_result, False  # 缓存命中/dry-run 不参与级联判断
+        return light_result, False  # cache hit / dry-run does not participate in cascade evaluation
 
     confidence = _confidence_heuristic(light_result.text)
     if confidence >= confidence_threshold:

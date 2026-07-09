@@ -1,4 +1,4 @@
-"""晨间简报图：聚合近 24h 总结 → 轻量层撰写 → 入库推送。"""
+"""Morning briefing graph: aggregate the last 24h of summaries → compose with the light tier → store and push."""
 from __future__ import annotations
 
 import time
@@ -40,7 +40,7 @@ def step_compose(ctx: TaskContext, state: dict) -> dict:
     )
     result = llm.complete(ctx.db, prompt, tier=policy.TIER_LIGHT, task=ctx.task,
                           step="compose", max_tokens=2000)
-    # 简报末尾附原文链接（本地拼接，0 token）
+    # append source links at the end of the briefing (assembled locally, 0 tokens)
     links = "\n".join(f"- [{it['title']}]({it['url']})" for it in items)
     state["briefing_md"] = result.text + "\n\n## Links\n" + links
     return state
@@ -50,8 +50,8 @@ def step_save(ctx: TaskContext, state: dict) -> dict:
     date = time.strftime("%Y-%m-%d")
     ctx.db.add(Briefing(date=date, content_md=state["briefing_md"], owner_id=ctx.task.owner_id))
     ctx.artifact("Briefing", state["briefing_md"][:2000])
-    ctx.db.commit()  # 先落库并释放写锁，再做外部推送——Telegram+SMTP 最长 ~30s，
-    #                  期间若持有写锁会堵死全站 POST（settings SELECT 会 autoflush 脏对象）
+    ctx.db.commit()  # persist and release the write lock first, then do the external push — Telegram+SMTP takes up to ~30s,
+    #                  and holding the write lock during that would deadlock all site-wide POSTs (a settings SELECT would autoflush dirty objects)
     bus.publish("briefing_ready", {"date": date, "task_id": ctx.task.id})
     notify_all(ctx.db, f"JarvisQwen briefing {date}", state["briefing_md"][:3500])
     return state

@@ -1,8 +1,9 @@
-"""Zotero 推送（单向：AAOS → Zotero）。使用 Zotero Web API v3。
+"""Zotero push (one-way: AAOS → Zotero). Uses the Zotero Web API v3.
 
-真正的双向同步需要 OAuth 授权流程与冲突合并逻辑，超出 V1 范围；
-这里实现「一键推送单篇/批量」，满足「把归档论文同步进我的文献库」的核心诉求。
-参考：https://www.zotero.org/support/dev/web_api/v3/basics
+True two-way sync would require an OAuth authorization flow and conflict-merge logic, which
+is beyond the scope of V1; here we implement "one-click push of a single item/batch", meeting
+the core need of "sync archived papers into my reference library".
+Reference: https://www.zotero.org/support/dev/web_api/v3/basics
 """
 from __future__ import annotations
 

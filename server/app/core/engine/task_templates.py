@@ -1,7 +1,7 @@
-"""任务模板：常见监控场景填空即用，降低自然语言下任务的门槛。
+"""Task templates: fill-in-the-blank ready-to-use for common monitoring scenarios, lowering the barrier to creating tasks in natural language.
 
-模板话术面向"知识工作监控"这一通用模式；当前连接器为 arXiv/Semantic Scholar
-（覆盖 CS/物理/数学/金融/生物/工程等学科），其他信息源按同一图结构扩展。
+The template wording targets the general pattern of "knowledge-work monitoring"; the current connectors are arXiv/Semantic Scholar
+(covering disciplines such as CS/physics/math/finance/biology/engineering), and other information sources extend along the same graph structure.
 """
 from __future__ import annotations
 
@@ -73,7 +73,7 @@ def apply_template(template_id: str, values: dict) -> tuple[str, dict, str]:
     for f in tpl["fields"]:
         val = values.get(f["key"], f.get("default", ""))
         if f["type"] == "text" and not str(val).strip():
-            # 无默认值的文本字段必填：空 query 会让 arXiv API 直接报错、任务必败
+            # text fields without a default are required: an empty query makes the arXiv API error out directly and the task is bound to fail
             raise ValueError(f"Field '{f['label']}' is required")
         params[f["key"]] = val
     title = f"{tpl['name']}: {params.get('query', '')}".strip(": ")[:60]

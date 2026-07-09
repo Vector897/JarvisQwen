@@ -3,17 +3,17 @@
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
 
-/** 使用指南（Guidelines）：面向首次使用者的新手指引，按主流 onboarding 规范组织——
- *  产品概述 → 快速上手 → 功能页面说明（严格按侧边栏顺序）→ 核心概念 → 常见问题。
- *  深入的技术说明（成本架构、安全机制）在「帮助」页（/help），本页只做入门。
- *  中英双语内联对照，语言开关切换。 */
+/** Guidelines: onboarding for first-time users, organized per common onboarding conventions —
+ *  overview → quick start → feature-page descriptions (strictly in sidebar order) → core concepts → FAQ.
+ *  In-depth technical notes (cost architecture, safety mechanisms) live on the Help page (/help); this page covers getting started only.
+ *  Bilingual inline (EN/ZH), toggled by the language switch. */
 
 export default function Guidelines() {
   const { lang } = useLang();
   const L = (en: string, zh: string) => (lang === "zh" ? zh : en);
   return (
     <div className="space-y-6 leading-relaxed">
-      {/* 一、产品概述 */}
+      {/* 1. Overview */}
       <section className="card space-y-3">
         <h2 className="text-lg font-bold">{L("1. Overview: what JarvisQwen is", "一、产品概述：JarvisQwen 是什么")}</h2>
         <p className="text-sm text-slate-600">
@@ -58,7 +58,7 @@ export default function Guidelines() {
         </div>
       </section>
 
-      {/* 二、快速上手 */}
+      {/* 2. Quick start */}
       <section className="card space-y-3">
         <h2 className="text-lg font-bold">{L("2. Quick start", "二、快速上手")}</h2>
         <ol className="list-decimal space-y-2 pl-6 text-sm text-slate-600">
@@ -92,7 +92,7 @@ export default function Guidelines() {
         </p>
       </section>
 
-      {/* 三、功能页面说明（按侧边栏顺序） */}
+      {/* 3. Feature pages (in sidebar order) */}
       <section className="space-y-2">
         <h2 className="text-lg font-bold">
           {L("3. Feature pages, in sidebar order", "三、功能页面说明（按侧边栏自上而下的顺序）")}
@@ -161,7 +161,7 @@ export default function Guidelines() {
         </div>
       </section>
 
-      {/* 四、核心概念 */}
+      {/* 4. Core concepts */}
       <section className="space-y-2">
         <h2 className="text-lg font-bold">{L("4. Core concepts", "四、核心概念")}</h2>
         <div className="card space-y-3 text-sm">
@@ -188,7 +188,7 @@ export default function Guidelines() {
         </div>
       </section>
 
-      {/* 五、常见问题 */}
+      {/* 5. Frequently asked questions */}
       <section className="space-y-2">
         <h2 className="text-lg font-bold">{L("5. Frequently asked questions", "五、常见问题")}</h2>
         <div className="space-y-2">

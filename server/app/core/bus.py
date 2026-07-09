@@ -1,4 +1,4 @@
-"""进程内事件总线：工作线程发布，SSE 订阅者消费（线程安全）。"""
+"""In-process event bus: worker threads publish, SSE subscribers consume (thread-safe)."""
 from __future__ import annotations
 
 import json
@@ -32,7 +32,7 @@ class EventBus:
             try:
                 q.put_nowait(msg)
             except queue.Full:
-                pass  # 慢消费者丢弃，SSE 重连后靠 REST 补齐状态
+                pass  # drop for slow consumers; state is reconciled via REST after SSE reconnects
 
     @staticmethod
     def sse_format(msg: dict[str, Any]) -> str:

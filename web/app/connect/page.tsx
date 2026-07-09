@@ -6,7 +6,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { api } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 
-/** 手机遥控页：两个二维码——① Telegram 遥控下任务 ② GitHub 仓库(分享/升级)。 */
+/** Mobile remote-control page: two QR codes — (1) Telegram for issuing tasks, (2) GitHub repository (share/upgrade). */
 
 const REPO = "https://github.com/Vector897/JarvisQwen";
 
@@ -25,7 +25,7 @@ export default function Connect() {
       </p>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* ① Telegram 遥控 */}
+        {/* (1) Telegram remote control */}
         <section className="card space-y-4">
           <h2 className="text-lg font-semibold">📲 {L("Command by Telegram", "Telegram 遥控下任务")}</h2>
           <p className="text-sm text-slate-500">
@@ -68,7 +68,7 @@ export default function Connect() {
           )}
         </section>
 
-        {/* ② GitHub 仓库 */}
+        {/* (2) GitHub repository */}
         <section className="card space-y-4">
           <h2 className="text-lg font-semibold">⭐ {L("The project, in one scan", "项目仓库二维码")}</h2>
           <p className="text-sm text-slate-500">

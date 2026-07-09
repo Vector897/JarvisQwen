@@ -1,9 +1,10 @@
-"""语义缓存 V2：词袋余弦相似度（纯 Python，无需外部向量库/embedding API 调用）。
+"""Semantic cache V2: bag-of-words cosine similarity (pure Python, no external vector store/embedding API calls).
 
-设计取舍：真正的 embedding 向量缓存需要额外的 embedding API 调用（有成本）或
-向量数据库（Qdrant，见架构文档 V2 升级路径）。这里用词频向量+余弦相似度实现
-「语义相近也能命中」的核心效果，零额外成本、零新增基础设施，适合个人/小团队规模
-（候选池数百条时性能足够；超大规模需迁移到 Qdrant，接口保持不变）。
+Design trade-off: a true embedding-vector cache requires extra embedding API calls (with a cost) or
+a vector database (Qdrant, see the V2 upgrade path in the architecture docs). Here we use term-frequency
+vectors + cosine similarity to achieve the core effect of "semantically similar queries can still hit",
+with zero extra cost and zero new infrastructure, suitable for individual/small-team scale (performance is
+sufficient with a candidate pool of a few hundred; very large scale requires migrating to Qdrant, keeping the interface unchanged).
 """
 from __future__ import annotations
 
@@ -19,8 +20,8 @@ from sqlalchemy.orm import Session
 from ...models import LlmCache
 from ..settings_store import get_setting
 
-_WORD_RE = re.compile(r"[a-zA-Z]+|[一-鿿]")  # 英文单词 或 单个中文字
-SIMILARITY_THRESHOLD = 0.93  # 相似度阈值：高于此值视为「同一问题」
+_WORD_RE = re.compile(r"[a-zA-Z]+|[一-鿿]")  # an English word or a single Chinese character
+SIMILARITY_THRESHOLD = 0.93  # similarity threshold: above this value is treated as "the same question"
 
 
 def _tokenize(text: str) -> Counter:
@@ -49,13 +50,13 @@ def lookup(db: Session, tier: str, prompt: str) -> str | None:
         return None
     now = time.time()
 
-    # ① 精确匹配（最快，命中率高的常规路径）
+    # ① Exact match (fastest, the common high-hit-rate path)
     exact = db.execute(select(LlmCache).where(LlmCache.id == _exact_key(tier, prompt))).scalar_one_or_none()
     if exact is not None and exact.expires_at >= now:
         exact.hit_count += 1
         return exact.response
 
-    # ② 语义相似匹配：同层未过期缓存中找余弦相似度最高者
+    # ② Semantic similarity match: find the highest cosine similarity among non-expired cache entries in the same tier
     query_vec = _tokenize(prompt)
     if not query_vec:
         return None
@@ -64,9 +65,10 @@ def lookup(db: Session, tier: str, prompt: str) -> str | None:
     ).scalars().all()
     best_row, best_score = None, 0.0
     for row in candidates:
-        # model 字段编码为 "tier::原模型::原prompt摘要"；这里用存储的 prompt_bow 字段近似，
-        # 简化实现：直接对 response 前置存储的原始 prompt 做比较（见 store() 中 id 的可逆哈希不可行，
-        # 因此改为把原始 prompt 存一份轻量索引，见下方 _PROMPT_INDEX）。
+        # The model field is encoded as "tier::original_model::original_prompt_digest"; here we approximate
+        # using the stored prompt_bow field. Simplified implementation: compare directly against the original
+        # prompt stored alongside the response (a reversible hash of the id in store() is infeasible, so
+        # instead we keep the original prompt in a lightweight index, see _PROMPT_INDEX below).
         original = _PROMPT_INDEX.get(row.id)
         if not original:
             continue
@@ -79,7 +81,7 @@ def lookup(db: Session, tier: str, prompt: str) -> str | None:
     return None
 
 
-# 进程内轻量索引：id -> 词频向量（重启后清空，退化为仅精确匹配，不影响正确性）
+# In-process lightweight index: id -> term-frequency vector (cleared on restart, degrading to exact-match only, which does not affect correctness)
 _PROMPT_INDEX: dict[str, Counter] = {}
 
 

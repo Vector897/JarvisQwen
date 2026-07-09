@@ -1,4 +1,4 @@
-"""任务：创建（自然语言或结构化）、列表、详情（流水线+Artifacts+ETA）、重跑/取消。"""
+"""Tasks: create (natural language or structured), list, detail (pipeline + artifacts + ETA), rerun/cancel."""
 from __future__ import annotations
 
 import json
@@ -18,13 +18,13 @@ router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
 
 class TaskIn(BaseModel):
-    type: str = ""  # 留空 + 给 prompt = 自然语言解析
+    type: str = ""  # leave empty + provide prompt = natural-language parsing
     prompt: str = ""
     params: dict = {}
     title: str = ""
     budget_limit_usd: float = 1.0
     priority: int = 5
-    template_id: str = ""  # 优先级：template_id > type > prompt
+    template_id: str = ""  # precedence: template_id > type > prompt
     template_values: dict = {}
 
 
@@ -34,12 +34,12 @@ def list_templates():
 
 
 def _parse_prompt(prompt: str) -> tuple[str, dict, str]:
-    """自然语言 → 任务。V1 规则解析（0 token），V2 换轻量层模型解析。"""
+    """Natural language → task. V1 uses rule-based parsing (0 tokens); V2 will switch to a lightweight-tier model for parsing."""
     p = prompt.strip()
     lowered = p.lower()
     if any(k in lowered for k in ("简报", "briefing", "日报", "digest")):
         return "briefing", {}, "Morning briefing"
-    # 默认视为文献跟踪/调研请求，提取主题
+    # By default, treat it as a paper-watch / research request and extract the topic
     for prefix in ("帮我调研", "调研", "跟踪", "检索", "查找", "搜索",
                    "research the latest progress on", "track new papers on", "track", "watch",
                    "research", "survey recent work on", "survey", "search", "find", "monitor"):
@@ -123,7 +123,7 @@ def task_detail(task_id: str, user: User = Depends(current_user), db: Session = 
 
 @router.post("/{task_id}/rerun")
 def rerun(task_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    """从最后检查点重新排队（FAILED/SUSPENDED/DONE 均可）。"""
+    """Re-queue from the last checkpoint (works for FAILED/SUSPENDED/DONE)."""
     t = db.execute(select(Task).where(Task.id == task_id)).scalar_one_or_none()
     if not t:
         raise HTTPException(404, "Task not found")

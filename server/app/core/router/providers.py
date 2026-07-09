@@ -1,4 +1,4 @@
-"""BYOK：API Key 归一化、厂商识别、加密存取、探活校验、多 Key 选择。"""
+"""BYOK: API key normalization, provider detection, encrypted storage, liveness validation, multi-key selection."""
 from __future__ import annotations
 
 import base64
@@ -15,10 +15,10 @@ from ...models import ApiKey
 
 PROVIDERS = ["qwen", "anthropic", "openai", "google", "deepseek", "openrouter", "custom"]
 
-# Qwen Cloud（DashScope 国际站）OpenAI 兼容端点——本项目的默认执行平面
+# Qwen Cloud (DashScope international site) OpenAI-compatible endpoint — this project's default execution plane
 QWEN_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 
-# 厂商 -> LiteLLM 需要的环境变量名
+# Provider -> environment variable name required by LiteLLM
 ENV_VAR = {
     "qwen": "DASHSCOPE_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
@@ -43,17 +43,17 @@ def decrypt_key(enc: str) -> str:
 
 
 def normalize_key(raw: str) -> str:
-    """自动格式修正：去空白/换行/引号/Bearer 前缀/变量名残留，全角转半角。"""
-    s = unicodedata.normalize("NFKC", raw)  # 全角 → 半角
+    """Automatic format cleanup: strip whitespace/newlines/quotes/Bearer prefix/leftover variable names, and convert full-width to half-width."""
+    s = unicodedata.normalize("NFKC", raw)  # full-width → half-width
     s = s.strip().strip("'\"`").strip()
     s = re.sub(r"^(?:Bearer|bearer)\s+", "", s)
     s = re.sub(r"^[A-Z_]*API_?KEY\s*[=:]\s*", "", s, flags=re.IGNORECASE)
-    s = "".join(s.split())  # 去除内部换行与空格（key 内不含空白）
+    s = "".join(s.split())  # remove internal newlines and spaces (keys contain no whitespace)
     return s.strip("'\"`")
 
 
 def detect_provider(key: str, base_url: str = "") -> str:
-    """按前缀识别厂商；识别不了返回空串让用户手选。"""
+    """Detect the provider by key prefix; return an empty string when undetectable so the user can pick manually."""
     if base_url:
         return "custom"
     if key.startswith("sk-ant-"):
@@ -65,7 +65,7 @@ def detect_provider(key: str, base_url: str = "") -> str:
     if key.startswith("sk-proj-") or key.startswith("sk-svcacct-"):
         return "openai"
     if key.startswith("sk-") and len(key) >= 35 and len(key) <= 60:
-        return ""  # Qwen / OpenAI / DeepSeek 前缀相同，需用户确认
+        return ""  # Qwen / OpenAI / DeepSeek share the same prefix; requires user confirmation
     return ""
 
 
@@ -76,7 +76,7 @@ def mask(key: str) -> str:
 
 
 def probe(provider: str, key: str, base_url: str = "") -> tuple[bool, str]:
-    """实时探活：发一次最小请求，返回 (可用, 人话消息)。"""
+    """Live liveness check: send one minimal request, return (usable, human-readable message)."""
     try:
         import litellm
 
@@ -108,10 +108,11 @@ def probe(provider: str, key: str, base_url: str = "") -> tuple[bool, str]:
 
 
 def import_env_keys() -> None:
-    """启动时自动导入环境变量 / .env 中的 DASHSCOPE_API_KEY（云部署零点击配 Key）。
+    """On startup, automatically import DASHSCOPE_API_KEY from environment variables / .env
+    (zero-click key configuration for cloud deployments).
 
-    查找顺序：进程环境变量 → 工作目录 .env → 仓库根 ../.env。
-    已存在等值的 qwen Key 时跳过，不重复入库。
+    Lookup order: process environment variables → working directory .env → repo root ../.env.
+    Skips insertion if an identical qwen key already exists, avoiding duplicate rows.
     """
     import os
 
@@ -136,7 +137,7 @@ def import_env_keys() -> None:
     with session() as db:
         for row in db.execute(select(ApiKey).where(ApiKey.provider == "qwen")).scalars():
             if decrypt_key(row.encrypted_key) == key:
-                return  # 同一把 Key 已在库中
+                return  # the same key is already in the database
         admin = db.execute(select(User).where(User.role == "admin")).scalars().first()
         if admin is None:
             return
@@ -146,7 +147,7 @@ def import_env_keys() -> None:
 
 
 def pick_key(db: Session, provider: str) -> ApiKey | None:
-    """按优先级选一个 active 的 Key（断路器把坏 Key 置为 broken/rate_limited）。"""
+    """Select one active key by priority (the circuit breaker marks bad keys as broken/rate_limited)."""
     return db.execute(
         select(ApiKey)
         .where(ApiKey.provider == provider, ApiKey.status == "active")
@@ -155,16 +156,16 @@ def pick_key(db: Session, provider: str) -> ApiKey | None:
 
 
 def provider_of_model(model: str) -> str:
-    """LiteLLM 模型名前缀 -> 厂商。"""
+    """LiteLLM model name prefix -> provider."""
     prefix = model.split("/", 1)[0]
     return {"gemini": "google", "vertex_ai": "google"}.get(prefix, prefix)
 
 
 def litellm_route(model: str, key_row: ApiKey) -> tuple[str, str]:
-    """把内部模型名转成 (LiteLLM 调用名, api_base)。
+    """Convert an internal model name into (LiteLLM call name, api_base).
 
-    qwen/* 走 Qwen Cloud 的 OpenAI 兼容端点（openai/ 前缀 + base_url）；
-    其余厂商用 LiteLLM 原生前缀，api_base 仅在用户自定义端点时设置。
+    qwen/* goes through Qwen Cloud's OpenAI-compatible endpoint (openai/ prefix + base_url);
+    other providers use LiteLLM's native prefix, with api_base set only for user-custom endpoints.
     """
     if provider_of_model(model) == "qwen":
         return "openai/" + model.split("/", 1)[-1], key_row.base_url or QWEN_BASE_URL

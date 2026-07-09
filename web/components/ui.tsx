@@ -1,6 +1,6 @@
 "use client";
 
-/** 共享的加载骨架与空状态组件，统一各页面的加载/空态观感。 */
+/** Shared loading-skeleton and empty-state components, unifying the loading/empty look across pages. */
 
 export function Skeleton({ rows = 3 }: { rows?: number }) {
   return (

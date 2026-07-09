@@ -1,4 +1,4 @@
-"""预算帽：日预算 + 任务预算双重限制；80% 告警、100% 熔断。"""
+"""Budget cap: dual limits of daily budget + task budget; alert at 80%, cut off at 100%."""
 from __future__ import annotations
 
 import time
@@ -15,7 +15,7 @@ class BudgetExceeded(Exception):
     pass
 
 
-_last_cutoff_notified_date = ""  # 同一天只推送一次熔断通知，避免刷屏
+_last_cutoff_notified_date = ""  # push the cutoff notification only once per day to avoid spamming
 
 
 def today_start_ts() -> float:
@@ -31,7 +31,7 @@ def today_spend(db: Session) -> float:
 
 
 def check(db: Session, task: Task | None = None, upcoming_estimate: float = 0.01) -> None:
-    """在每次 LLM 出境调用前检查。超限抛 BudgetExceeded → 任务挂起而非死循环烧钱。"""
+    """Check before every outbound LLM call. Raises BudgetExceeded when over the limit → task is suspended rather than burning money in an infinite loop."""
     global _last_cutoff_notified_date
     daily_limit = float(get_setting(db, "daily_budget_usd"))
     spent = today_spend(db)
@@ -41,7 +41,7 @@ def check(db: Session, task: Task | None = None, upcoming_estimate: float = 0.01
         if get_setting(db, "notify_on_budget_cutoff") and _last_cutoff_notified_date != today:
             _last_cutoff_notified_date = today
             from ...connectors.notify import notify_all
-            db.commit()  # 释放写锁再做外部推送（Telegram/SMTP 网络调用期间不得持锁）
+            db.commit()  # release the write lock before external push (must not hold a lock during Telegram/SMTP network calls)
             notify_all(db, "JarvisQwen budget cutoff", f"Today's spend reached ${spent:.2f}/${daily_limit:.2f}. Tasks suspended until tomorrow or a higher cap.")
         raise BudgetExceeded(f"Daily budget exhausted (${spent:.2f}/${daily_limit:.2f})")
     if spent >= 0.8 * daily_limit:

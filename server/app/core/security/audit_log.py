@@ -1,4 +1,4 @@
-"""append-only 推理-行动审计日志。"""
+"""Append-only reasoning-action audit log."""
 from __future__ import annotations
 
 from sqlalchemy.orm import Session

@@ -12,8 +12,8 @@ export async function api<T = any>(
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     if (res.status === 401 && typeof window !== "undefined" && !path.includes("/auth/")) {
-      // 区分两种 401：访问码网关拦截 → 跳回首页并提示输码；普通未登录 → 跳回首页。
-      // 此前两者都静默弹回，没拿到 ?k= 魔法链接的访客点 Quick Try 会莫名其妙被弹出。
+      // Distinguish two kinds of 401: access-gate rejection → redirect home and prompt for the code; ordinary not-signed-in → redirect home.
+      // Previously both bounced back silently, so a visitor without the ?k= magic link who clicked Quick Try would be kicked out inexplicably.
       const needCode = String(body.detail || "").includes("Access code");
       window.location.href = needCode ? "/home?code=required" : "/home";
       throw new Error(body.detail || "Not signed in");
@@ -29,7 +29,7 @@ export const put = <T = any>(path: string, body: any) =>
   api<T>(path, { method: "PUT", body: JSON.stringify(body) });
 export const del = <T = any>(path: string) => api<T>(path, { method: "DELETE" });
 
-// SSE 订阅已迁移到全局单连接：见 components/events-provider.tsx 的 useEvents()
+// SSE subscription has moved to a single global connection: see useEvents() in components/events-provider.tsx
 
 export function fmtTime(ts: number): string {
   if (!ts) return "-";
@@ -49,7 +49,7 @@ export function fmtEta(ts: number, lang: "zh" | "en" = "en"): string {
   return `ETA ${new Date(ts * 1000).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
-// [中文, English, badge class]
+// [Chinese, English, badge class]
 export const STATUS_LABEL: Record<string, [string, string, string]> = {
   QUEUED: ["排队中", "Queued", "bg-slate-200 text-slate-700"],
   RUNNING: ["执行中", "Running", "bg-blue-100 text-blue-700"],

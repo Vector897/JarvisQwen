@@ -1,10 +1,13 @@
-"""统一 LLM 调用点：所有出境请求的唯一通道。
+"""Unified LLM call point: the single channel for all outbound requests.
 
-六道工序：脱敏 → 缓存 → 预算 → 路由 → 弹性调用（退避/断路器/fallback）→ 审计记账。
-任何 prompt 都不可能绕过安全与记账——这是本项目的核心工程约束。
+Six-stage pipeline: redact → cache → budget → route → resilient call
+(backoff / circuit breaker / fallback) → audit accounting.
+No prompt can ever bypass security and accounting — this is the project's core
+engineering constraint.
 
-未配置任何 API Key 时进入 dry-run 模式：返回模拟响应并在审计中标记 simulated，
-保证系统无 Key 也能完整跑通流程（开发/演示用）。
+When no API key is configured, it enters dry-run mode: returns a simulated
+response and marks it as simulated in the audit log, ensuring the system can run
+the full pipeline end-to-end even without a key (for development/demo use).
 """
 from __future__ import annotations
 
@@ -54,7 +57,7 @@ def _call_litellm(db: Session, model: str, prompt: str, max_tokens: int) -> tupl
     usage = getattr(resp, "usage", None)
     tin = getattr(usage, "prompt_tokens", 0) or 0
     tout = getattr(usage, "completion_tokens", 0) or 0
-    cost = policy.exact_cost(model, tin, tout)  # Qwen 官方价目表优先
+    cost = policy.exact_cost(model, tin, tout)  # Qwen official price list takes precedence
     if cost is None:
         try:
             cost = float(litellm.completion_cost(completion_response=resp))
@@ -82,33 +85,34 @@ def complete(
 ) -> LlmResult:
     task_id = task.id if task else ""
 
-    # ① 脱敏（占位符替换，返回后还原）
+    # (1) Redaction (replace with placeholders, restore after the response returns)
     level = str(get_setting(db, "redact_level"))
     red = redact(prompt, level)
     if red.blocked:
         raise RedactionBlocked(red.reason)
     safe_prompt = red.text
 
-    # ② 语义缓存
+    # (2) Semantic cache
     hit = cache.lookup(db, tier, safe_prompt)
     if hit is not None:
         audit_log.record(db, task_id=task_id, step=step, model="(cache)", input_text=safe_prompt,
                          output_text=hit, cached=True)
         return LlmResult(text=red.restore(hit), model="(cache)", cost_usd=0, cached=True)
 
-    # ③ 预算检查（超限抛 BudgetExceeded → 引擎将任务挂起）
+    # (3) Budget check (raises BudgetExceeded when over limit → engine suspends the task)
     budget_guard.check(db, task, upcoming_estimate=policy.estimate_cost(tier, len(safe_prompt)))
 
-    # dry-run：没有任何 Key 时返回模拟响应，流程照走
+    # dry-run: when no key exists, return a simulated response and keep the pipeline running
     if not _has_any_key(db):
         fake = f"[simulated/dry-run] tier={tier}, no API key configured. Prompt digest: {safe_prompt[:120]}"
         audit_log.record(db, task_id=task_id, step=step, model="(simulated)", input_text=safe_prompt,
                          output_text=fake, simulated=True)
         return LlmResult(text=fake, model="(simulated)", cost_usd=0, simulated=True)
 
-    # ④⑤ 路由 + 弹性调用（退避/断路器/fallback 链）
-    # 先 commit：把进度/缓存计数等 autoflush 产生的脏写落库并释放 SQLite 写锁，
-    # 否则写锁会被持有横跨整个（最长 120s 的）网络调用，堵死全站 POST。
+    # (4)(5) Routing + resilient call (backoff / circuit breaker / fallback chain)
+    # Commit first: flush the dirty writes produced by autoflush (progress, cache counters, etc.)
+    # to the database and release the SQLite write lock; otherwise the write lock would be held
+    # across the entire (up to 120s) network call, blocking every POST site-wide.
     db.commit()
     chain = policy.models_for_tier(db, tier)
     retries = int(get_setting(db, "max_retries"))
@@ -118,7 +122,7 @@ def complete(
 
     model, (text, cost, tin, tout) = resilience.call_with_fallbacks(chain, _do, retries_per_model=retries)
 
-    # ⑥ 审计记账 + 缓存回填 + 任务累计花费
+    # (6) Audit accounting + cache backfill + accumulate task spend
     audit_log.record(db, task_id=task_id, step=step, model=model, tokens_in=tin, tokens_out=tout,
                      cost_usd=cost, input_text=safe_prompt, output_text=text)
     cache.store(db, tier, safe_prompt, text, model)

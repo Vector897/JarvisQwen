@@ -1,4 +1,4 @@
-"""arXiv API 轮询（免费，无需 Key）。返回论文元数据列表。"""
+"""arXiv API polling (free, no key required). Returns a list of paper metadata."""
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET

@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useLang } from "@/lib/i18n";
 
-/** 一键部署页：一段给 AI-IDE 的提示词——复制给 Claude Code / Cursor 等,
- *  它就会替用户在本地装好(或升级)整个项目。面向零技术背景用户。 */
+/** One-click deploy page: a prompt for an AI IDE — copy it into Claude Code / Cursor / etc.,
+ *  and it will install (or upgrade) the whole project locally for the user. Aimed at non-technical users. */
 
 const PROMPT = `You are setting up JarvisQwen — an open-source, self-hosted AI research autopilot — on this computer. Repository: https://github.com/Vector897/JarvisQwen
 

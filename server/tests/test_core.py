@@ -1,4 +1,4 @@
-"""核心路径单测：Key 归一化、脱敏还原、断路器、退避、预算、引擎检查点续跑。"""
+"""Core-path unit tests: Key normalization, redaction/restore, circuit breaker, backoff, budget, engine checkpoint resume."""
 from __future__ import annotations
 
 import os
@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-# 测试用独立数据目录（必须在导入 app 模块前设置）
+# dedicated data directory for tests (must be set before importing app modules)
 _tmp = tempfile.mkdtemp()
 os.environ["AAOS_DATA_DIR"] = _tmp
 
@@ -20,12 +20,12 @@ from app.core.router import providers, resilience  # noqa: E402
 from app.core.security.redact import redact  # noqa: E402
 
 
-# ---------- Key 归一化与识别 ----------
+# ---------- Key normalization and detection ----------
 def test_normalize_key_strips_noise():
     assert providers.normalize_key("  'sk-ant-abc123'  \n") == "sk-ant-abc123"
     assert providers.normalize_key("Bearer sk-ant-xyz") == "sk-ant-xyz"
     assert providers.normalize_key("OPENAI_API_KEY=sk-proj-foo") == "sk-proj-foo"
-    assert providers.normalize_key("ｓｋ－ant－full") == "sk-ant-full"  # 全角转半角
+    assert providers.normalize_key("ｓｋ－ant－full") == "sk-ant-full"  # full-width to half-width
 
 
 def test_detect_provider():
@@ -41,7 +41,7 @@ def test_encrypt_roundtrip():
     assert "sk-secret" not in enc
 
 
-# ---------- 脱敏与还原 ----------
+# ---------- Redaction and restore ----------
 def test_redact_and_restore():
     text = "联系 alice@example.com，密钥 sk-abcdefghijklmnop1234 别泄露"
     r = redact(text, "medium")
@@ -56,16 +56,16 @@ def test_redact_high_blocks():
     assert r.blocked
 
 
-# ---------- 断路器与退避 ----------
+# ---------- Circuit breaker and backoff ----------
 def test_circuit_breaker_opens_and_recovers():
     br = resilience.CircuitBreaker(window=4, threshold=0.5, cooldown=0.05)
     for _ in range(4):
         br.report(False)
-    assert not br.allow()  # 熔断
+    assert not br.allow()  # tripped open
     import time
 
     time.sleep(0.06)
-    assert br.allow()  # half-open 放探测
+    assert br.allow()  # half-open lets a probe through
     br.report(True)
     assert br.state == "closed"
 
@@ -81,10 +81,10 @@ def test_fallback_chain():
 
     model, result = resilience.call_with_fallbacks(["bad", "good"], fn, retries_per_model=1)
     assert model == "good" and result == "ok"
-    assert calls.count("bad") == 2  # 1 次 + 1 重试
+    assert calls.count("bad") == 2  # 1 call + 1 retry
 
 
-# ---------- 引擎：检查点续跑 ----------
+# ---------- Engine: checkpoint resume ----------
 def test_engine_checkpoint_resume():
     from app.core.engine.engine import StepDef, latest_checkpoint, register, run_task
     from app.db import init_db, session
@@ -117,15 +117,15 @@ def test_engine_checkpoint_resume():
         run_task(db, task)
         assert task.status == "FAILED"
         cp = latest_checkpoint(db, task.id)
-        assert cp is not None and cp.step_name == "s1"  # s1 的成果被保住
+        assert cp is not None and cp.step_name == "s1"  # s1's result is preserved
 
         task.status = "QUEUED"
         run_task(db, task)
         assert task.status == "DONE"
-    assert executed == ["s1", "s2", "s2"]  # 重跑没有重复执行 s1
+    assert executed == ["s1", "s2", "s2"]  # rerun did not re-execute s1
 
 
-# ---------- 预算熔断 ----------
+# ---------- Budget cutoff ----------
 def test_budget_cutoff():
     from app.core.budget.guard import BudgetExceeded, check
     from app.core.settings_store import set_setting
