@@ -23,12 +23,38 @@ export default function Deploy() {
   const { lang } = useLang();
   const L = <T,>(en: T, zh: T): T => (lang === "zh" ? zh : en);
   const [copied, setCopied] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   function copy() {
-    navigator.clipboard.writeText(PROMPT).then(() => {
+    const done = () => {
+      setFailed(false);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
-    });
+    };
+    // navigator.clipboard only exists in secure contexts (HTTPS / localhost).
+    // The public demo is served over plain HTTP, where it is undefined — fall back to execCommand.
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(PROMPT).then(done).catch(legacyCopy);
+    } else {
+      legacyCopy();
+    }
+
+    function legacyCopy() {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = PROMPT;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        ok ? done() : setFailed(true);
+      } catch {
+        setFailed(true);
+      }
+    }
   }
 
   return (
@@ -50,6 +76,12 @@ export default function Deploy() {
             {copied ? L("✅ Copied!", "✅ 已复制!") : L("📋 Copy the prompt", "📋 一键复制")}
           </button>
         </div>
+        {failed && (
+          <p className="text-xs text-amber-600">
+            {L("Auto-copy is blocked here — select the text below and copy manually (Ctrl/Cmd+C).",
+               "此环境禁用了自动复制,请手动选中下方文本复制(Ctrl/Cmd+C)。")}
+          </p>
+        )}
         <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-4 font-mono text-xs leading-5 text-slate-200">
 {PROMPT}
         </pre>
