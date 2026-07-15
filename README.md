@@ -146,11 +146,11 @@ With no API key configured the system runs in **dry-run mode**: the full pipelin
 curl -fsSL https://raw.githubusercontent.com/Vector897/JarvisQwen/main/install.sh | bash
 ```
 
-Open `http://<ECS-IP>:3000` and click **Quick Try** to enter the console (no login — single-user local mode), add your key, add a subscription. Done — your first briefing arrives tomorrow morning. Only expose TCP **22 and 3000** in the security group: the backend (8000) is loopback-only and inbound per-IP rate limiting is on by default. All state lives in `./data`; migrating hosts is copy-and-compose-up.
+Open `http://<ECS-IP>` (also served on `:3000`) and click **Quick Try** to enter the console (no login — single-user local mode), add your key, add a subscription. Done — your first briefing arrives tomorrow morning. Expose TCP **22, 80 and 3000** in the security group (port 80 gives a clean URL that also passes restrictive egress firewalls, e.g. some campus networks that block `:3000`): the backend (8000) is loopback-only and inbound per-IP rate limiting is on by default. All state lives in `./data`; migrating hosts is copy-and-compose-up.
 
 ## Console
 
-Responsive Next.js PWA (add-to-home-screen on mobile), **English by default, 中文 toggle**: live pipeline DAG per task, cost dashboard with budget progress, subscription manager, searchable knowledge library with cross-paper QA, approval inbox, audit trail, dark mode.
+Responsive Next.js PWA (add-to-home-screen on mobile), **English by default, 中文 toggle**: live pipeline DAG per task with click-to-jump artifacts, clickable source links in results, one-click report export (Markdown / PDF / HTML), cost dashboard with budget progress, subscription manager, searchable knowledge library with cross-paper QA, approval inbox, audit trail, dark mode.
 
 ## Tests
 
