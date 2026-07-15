@@ -26,6 +26,7 @@ export default function TaskDetail() {
   const { subscribe } = useEvents();
   const toast = useToast();
   const { t, lang } = useLang();
+  const L = (en: string, zh: string) => (lang === "zh" ? zh : en);
 
   const load = useCallback(() => api(`/api/tasks/${id}`).then(setTask).catch(() => {}), [id]);
 
@@ -41,6 +42,23 @@ export default function TaskDetail() {
   if (!task) return <Skeleton rows={4} />;
   const [label, cls] = statusLabel(task.status, lang);
 
+  const scrollToEl = (elId: string) =>
+    document.getElementById(elId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  // Click a pipeline node to jump straight to that step's artifact — expand it, then scroll.
+  const onNodeClick = (_: unknown, node: Node) => {
+    const step = task.pipeline[Number(node.id)]?.name;
+    const idx = task.artifacts.findIndex((a: any) => a.step === step);
+    if (idx >= 0) {
+      const el = document.getElementById(`artifact-${idx}`) as HTMLDetailsElement | null;
+      if (el) {
+        el.open = true;
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+    }
+    scrollToEl("artifacts");
+  };
+
   const nodes: Node[] = task.pipeline.map((s: any, i: number) => ({
     id: String(i),
     position: { x: i * 170, y: 40 },
@@ -53,6 +71,7 @@ export default function TaskDetail() {
       whiteSpace: "pre-line",
       width: 140,
       textAlign: "center" as const,
+      cursor: "pointer",
     },
   }));
   const edges: Edge[] = task.pipeline.slice(1).map((_: any, i: number) => ({
@@ -80,9 +99,21 @@ export default function TaskDetail() {
         </div>
       </div>
 
+      {task.artifacts.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span className="text-slate-400">
+            {L("Tip: click a step to jump to its artifact", "提示：点击流程节点可跳到该步的产出物")}
+          </span>
+          <button onClick={() => scrollToEl("artifacts")} className="font-medium text-blue-600 hover:underline">
+            {L(`↓ View artifacts (${task.artifacts.length})`, `↓ 查看产出物（${task.artifacts.length}）`)}
+          </button>
+        </div>
+      )}
+
       <div className="card h-48 p-0">
         <ReactFlow nodes={nodes} edges={edges} fitView proOptions={{ hideAttribution: true }}
-          nodesDraggable={false} nodesConnectable={false} zoomOnScroll={false} panOnDrag>
+          nodesDraggable={false} nodesConnectable={false} zoomOnScroll={false} panOnDrag
+          onNodeClick={onNodeClick}>
           <Background />
         </ReactFlow>
       </div>
@@ -108,10 +139,13 @@ export default function TaskDetail() {
         </div>
       )}
 
-      <h2 className="text-lg font-semibold">{t("taskDetail.artifacts")}</h2>
+      <h2 id="artifacts" className="scroll-mt-4 text-lg font-semibold">
+        {t("taskDetail.artifacts")}
+        {task.artifacts.length > 0 ? ` · ${task.artifacts.length}` : ""}
+      </h2>
       <div className="space-y-2">
         {task.artifacts.map((a: any, i: number) => (
-          <details key={i} className="card" open>
+          <details key={i} id={`artifact-${i}`} className="card scroll-mt-4" open={i === 0}>
             <summary className="cursor-pointer text-sm font-medium">
               {a.name} <span className="text-xs text-slate-400">· {a.step} · {fmtTime(a.ts)}</span>
             </summary>
