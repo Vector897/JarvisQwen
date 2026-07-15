@@ -24,17 +24,21 @@ export default function Home() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
       {/* Hero */}
-      <section className="flex flex-col items-center text-center">
-        <img src="/logo-icon.png" alt="JarvisQwen"
-          className="mb-5 h-24 w-24 rounded-3xl shadow-lg ring-1 ring-slate-200 dark:ring-slate-700" />
-        <h1 className="text-5xl font-extrabold tracking-tight sm:text-6xl">
-          <span className="text-sky-500">Jarvis</span>
-          <span className="text-slate-900 dark:text-white">Qwen</span>
-        </h1>
-        <p className="mt-3 text-sm font-medium tracking-widest text-sky-600/80 dark:text-sky-400/80">
-          YOUR 24/7 AI BUTLER · POWERED BY QWEN
-        </p>
-        <div className="mt-7 flex flex-wrap justify-center gap-3">
+      <section className="flex flex-col items-center">
+        <div className="flex items-center gap-5 sm:gap-7">
+          <img src="/logo-icon.png" alt="JarvisQwen"
+            className="h-24 w-24 shrink-0 rounded-3xl shadow-lg ring-1 ring-slate-200 sm:h-32 sm:w-32 dark:ring-slate-700" />
+          <div className="text-left">
+            <h1 className="text-5xl font-extrabold tracking-tight sm:text-6xl">
+              <span className="text-sky-500">Jarvis</span>
+              <span className="text-slate-900 dark:text-white">Qwen</span>
+            </h1>
+            <p className="mt-2 text-xs font-medium tracking-widest text-sky-600/80 sm:text-sm dark:text-sky-400/80">
+              YOUR 24/7 AI BUTLER · POWERED BY QWEN
+            </p>
+          </div>
+        </div>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link href="/guidelines"
             className="rounded-xl bg-sky-500 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-600">
             Quick Try →
@@ -79,12 +83,11 @@ export default function Home() {
       {/* The Zen — two columns on desktop to use the width */}
       <section className="mt-12 border-t border-slate-200 pt-10 dark:border-slate-800">
         <h2 className="text-center text-2xl font-bold text-slate-900 dark:text-white">The Zen of JarvisQwen</h2>
-        <div className="mx-auto mt-6 grid max-w-4xl gap-4 sm:grid-cols-2">
+        <div className="mx-auto mt-6 max-w-2xl space-y-4">
           {ZEN.map(([en, zh], i) => (
-            <div key={i}
-              className="rounded-xl border border-slate-200 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+            <div key={i} className="text-center">
               <p className="text-[15px] leading-6 text-slate-800 dark:text-slate-200">{en}</p>
-              <p className="mt-1 text-xs text-slate-500">{zh}</p>
+              <p className="text-xs text-slate-500">{zh}</p>
             </div>
           ))}
         </div>
