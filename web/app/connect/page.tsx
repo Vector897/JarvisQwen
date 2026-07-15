@@ -10,6 +10,49 @@ import { useLang } from "@/lib/i18n";
 
 const REPO = "https://github.com/Vector897/JarvisQwen";
 
+// Contact tiles with inline (self-contained) brand marks.
+const CONTACTS: { label: string; href: string; icon: React.ReactNode }[] = [
+  {
+    label: "Email",
+    href: "mailto:EIITF@outlook.com",
+    icon: (
+      <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#2563eb" strokeWidth="1.8" aria-hidden="true">
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="m3 7.5 9 6 9-6" />
+      </svg>
+    ),
+  },
+  {
+    label: "GitHub",
+    href: "https://github.com/Vector897",
+    icon: (
+      <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor" aria-hidden="true">
+        <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.11.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.05-.72.08-.71.08-.71 1.17.08 1.78 1.2 1.78 1.2 1.04 1.78 2.73 1.27 3.4.97.1-.76.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .98-.31 3.2 1.18a11.1 11.1 0 0 1 5.83 0c2.22-1.49 3.2-1.18 3.2-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.2.68.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z" />
+      </svg>
+    ),
+  },
+  {
+    label: "Devpost",
+    href: "https://devpost.com/aigc-vm-uk",
+    icon: (
+      <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+        <path fill="#003E54" d="M6.3 3h11.4L23 12l-5.3 9H6.3L1 12z" />
+        <text x="12" y="15.6" textAnchor="middle" fontSize="9" fontWeight="700" fill="#fff" fontFamily="Arial, sans-serif">D</text>
+      </svg>
+    ),
+  },
+  {
+    label: "YouTube",
+    href: "https://www.youtube.com/@OrionVector",
+    icon: (
+      <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+        <path fill="#FF0000" d="M23.5 6.5a3 3 0 0 0-2.1-2.12C19.5 3.8 12 3.8 12 3.8s-7.5 0-9.4.58A3 3 0 0 0 .5 6.5 31.3 31.3 0 0 0 0 12a31.3 31.3 0 0 0 .5 5.5 3 3 0 0 0 2.1 2.12c1.9.58 9.4.58 9.4.58s7.5 0 9.4-.58a3 3 0 0 0 2.1-2.12A31.3 31.3 0 0 0 24 12a31.3 31.3 0 0 0-.5-5.5Z" />
+        <path fill="#fff" d="M9.6 15.5V8.5l6.2 3.5Z" />
+      </svg>
+    ),
+  },
+];
+
 export default function Connect() {
   const [bot, setBot] = useState<any>(null);
   const { lang } = useLang();
@@ -107,14 +150,16 @@ export default function Connect() {
           {L("Didn't find your answer? I'm a real person — reach me on any of these.",
              "没找到答案？真人回复，以下任意方式都能找到我。")}
         </p>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <a href="mailto:EIITF@outlook.com" className="btn-ghost text-center text-sm">✉️ EIITF@outlook.com</a>
-          <a href="https://github.com/Vector897" target="_blank" rel="noopener noreferrer"
-            className="btn-ghost text-center text-sm">🐙 GitHub</a>
-          <a href="https://devpost.com/aigc-vm-uk" target="_blank" rel="noopener noreferrer"
-            className="btn-ghost text-center text-sm">🏆 Devpost</a>
-          <a href="https://www.youtube.com/@OrionVector" target="_blank" rel="noopener noreferrer"
-            className="btn-ghost text-center text-sm">▶️ YouTube</a>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {CONTACTS.map((c) => (
+            <a key={c.label} href={c.href}
+              target={c.href.startsWith("mailto:") ? undefined : "_blank"}
+              rel="noopener noreferrer"
+              className="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border border-slate-200 p-3 text-center text-xs font-medium text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+              {c.icon}
+              <span>{c.label}</span>
+            </a>
+          ))}
         </div>
       </section>
     </div>
