@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
 
 /** Public landing page (no login required): privacy notice at the top → manifesto → mission → author & repository.
  *  Standalone dark canvas (nav/topbar are not rendered on /home), styled to match the logo. */
@@ -22,25 +21,6 @@ const ZEN: [string, string][] = [
 ];
 
 export default function Home() {
-  const [code, setCode] = useState("");
-  const [needCode, setNeedCode] = useState(false);
-  const codeInput = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    // api.ts redirects back to /home?code=required on a 401 from the access-code gate — highlight the input, explain why, and focus it
-    const need = new URLSearchParams(window.location.search).get("code") === "required";
-    setNeedCode(need);
-    if (need) codeInput.current?.focus();
-  }, []);
-
-  function enterWithCode(e: React.FormEvent) {
-    e.preventDefault();
-    const k = code.trim();
-    if (!k) return;
-    // Use the middleware's magic-link logic: ?k= writes the aaos_access cookie, then redirects to a clean /dashboard
-    window.location.href = `/dashboard?k=${encodeURIComponent(k)}`;
-  }
-
   return (
     <div className="mx-auto max-w-3xl">
       <div className="overflow-hidden rounded-3xl bg-[#05070d] text-slate-200 shadow-2xl ring-1 ring-slate-800">
@@ -67,33 +47,6 @@ export default function Home() {
               ⭐ GitHub
             </a>
           </div>
-
-          {/* Access-code entry: all /api routes on the public demo require an access code; a visitor who
-              didn't arrive via a ?k= magic link and clicks Quick Try gets bounced back here by a 401 (?code=required highlights the prompt) */}
-          <form onSubmit={enterWithCode}
-            className={`mt-5 flex w-full max-w-md flex-col items-center gap-2 rounded-2xl border p-4 transition
-              ${needCode ? "border-amber-500/70 bg-amber-950/30" : "border-slate-800 bg-slate-900/40"}`}>
-            {needCode && (
-              <p className="text-xs font-semibold text-amber-400">
-                This demo requires an access code — paste the one you were given. ·
-                该演示需要访问码，请粘贴你收到的访问码
-              </p>
-            )}
-            <div className="flex w-full gap-2">
-              <input ref={codeInput} value={code} onChange={(e) => setCode(e.target.value)}
-                placeholder="Access code · 访问码 (jq-…)"
-                className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-sky-500" />
-              <button type="submit"
-                className="shrink-0 rounded-xl bg-slate-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500">
-                Enter →
-              </button>
-            </div>
-            <p className="text-[11px] text-slate-600">
-              Received a full invite link ending in <span className="font-mono">?k=…</span>?
-              Open that link directly — it signs you in automatically, nothing to type here.
-              · 如果你收到的是结尾带 <span className="font-mono">?k=…</span> 的完整链接，直接打开它即可自动进入，无需在此输入。
-            </p>
-          </form>
         </div>
 
         {/* Privacy notice — placed first */}
