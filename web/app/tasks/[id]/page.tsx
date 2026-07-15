@@ -19,16 +19,44 @@ const NODE_COLOR: Record<string, string> = {
   pending: "#cbd5e1",
 };
 
-// Render plain-text artifact content, turning http(s) URLs into clickable links.
+// Render artifact content, turning markdown links [text](url) and bare http(s) URLs into blue links.
+const LINK_RE = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s]+)/g;
 function linkify(text: string) {
-  return text.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
-    /^https?:\/\//.test(part) ? (
-      <a key={i} href={part} target="_blank" rel="noopener noreferrer"
-        className="text-blue-600 underline break-all hover:text-blue-700">{part}</a>
-    ) : (
-      part
-    )
-  );
+  const out: (string | React.ReactNode)[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  LINK_RE.lastIndex = 0;
+  while ((m = LINK_RE.exec(text)) !== null) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    const label = m[1] ?? m[3];
+    const href = m[2] ?? m[3];
+    out.push(
+      <a key={m.index} href={href} target="_blank" rel="noopener noreferrer"
+        className="text-blue-600 underline break-all hover:text-blue-700">{label}</a>
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
+// Escape text and convert markdown/bare links to anchors, for the HTML/PDF export.
+function contentToHtml(text: string): string {
+  const esc = (x: string) =>
+    x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  let out = "";
+  let last = 0;
+  let m: RegExpExecArray | null;
+  LINK_RE.lastIndex = 0;
+  while ((m = LINK_RE.exec(text)) !== null) {
+    out += esc(text.slice(last, m.index));
+    const label = m[1] ?? m[3];
+    const href = m[2] ?? m[3];
+    out += `<a href="${esc(href)}">${esc(label)}</a>`;
+    last = m.index + m[0].length;
+  }
+  out += esc(text.slice(last));
+  return out;
 }
 
 export default function TaskDetail() {
@@ -71,7 +99,8 @@ export default function TaskDetail() {
     scrollToEl("artifacts");
   };
 
-  // Assemble the task + its artifacts into a downloadable document (client-side, no deps).
+  // Assemble the task + all its artifacts into a downloadable document (client-side, no deps).
+  // Links stay clickable: markdown keeps [text](url); HTML/PDF get real <a> anchors.
   function buildDoc(fmt: "md" | "html") {
     const title = task.title || task.type;
     const meta = `Type: ${task.type} · Status: ${task.status}` +
@@ -79,19 +108,29 @@ export default function TaskDetail() {
     if (fmt === "md") {
       let s = `# ${title}\n\n${meta}\n\n## Artifacts\n\n`;
       for (const a of task.artifacts)
-        s += `### ${a.name} · ${a.step} · ${fmtTime(a.ts)}\n\n\`\`\`\n${a.content}\n\`\`\`\n\n`;
+        s += `### ${a.name} · ${a.step} · ${fmtTime(a.ts)}\n\n${a.content}\n\n`;
       return { text: s, mime: "text/markdown", ext: "md" };
     }
     const esc = (x: string) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     let b = `<h1>${esc(title)}</h1><p>${esc(meta)}</p>`;
     for (const a of task.artifacts)
       b += `<h3>${esc(a.name)} · ${esc(a.step)} · ${esc(fmtTime(a.ts))}</h3>` +
-        `<pre style="white-space:pre-wrap;background:#f6f8fa;padding:12px;border-radius:8px;overflow:auto">${esc(a.content)}</pre>`;
+        `<pre style="white-space:pre-wrap;background:#f6f8fa;padding:12px;border-radius:8px;overflow:auto">${contentToHtml(a.content)}</pre>`;
     const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title></head>` +
       `<body style="font-family:system-ui,sans-serif;max-width:820px;margin:2rem auto;padding:0 1rem;line-height:1.5">${b}</body></html>`;
     return { text: html, mime: "text/html", ext: "html" };
   }
-  function downloadDoc(fmt: "md" | "html") {
+  function downloadDoc(fmt: "md" | "html" | "pdf") {
+    if (fmt === "pdf") {
+      // Render the HTML doc in a new window and hand off to the browser's "Save as PDF".
+      const w = window.open("", "_blank");
+      if (!w) return;
+      w.document.write(buildDoc("html").text);
+      w.document.close();
+      w.focus();
+      setTimeout(() => w.print(), 400);
+      return;
+    }
     const { text, mime, ext } = buildDoc(fmt);
     const url = URL.createObjectURL(new Blob([text], { type: `${mime};charset=utf-8` }));
     const el = document.createElement("a");
@@ -183,18 +222,10 @@ export default function TaskDetail() {
         </div>
       )}
 
-      <div id="artifacts" className="flex scroll-mt-4 flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">
-          {t("taskDetail.artifacts")}
-          {task.artifacts.length > 0 ? ` · ${task.artifacts.length}` : ""}
-        </h2>
-        {task.artifacts.length > 0 && (
-          <div className="flex gap-2">
-            <button onClick={() => downloadDoc("md")} className="btn-ghost text-xs">⬇ .md</button>
-            <button onClick={() => downloadDoc("html")} className="btn-ghost text-xs">⬇ .html</button>
-          </div>
-        )}
-      </div>
+      <h2 id="artifacts" className="scroll-mt-4 text-lg font-semibold">
+        {t("taskDetail.artifacts")}
+        {task.artifacts.length > 0 ? ` · ${task.artifacts.length}` : ""}
+      </h2>
       <div className="space-y-2">
         {task.artifacts.map((a: any, i: number) => (
           <details key={i} id={`artifact-${i}`} className="card scroll-mt-4" open={i === 0}>
@@ -208,6 +239,22 @@ export default function TaskDetail() {
         ))}
         {task.artifacts.length === 0 && <p className="text-sm text-slate-400">{t("taskDetail.noArtifacts")}</p>}
       </div>
+
+      {task.artifacts.length > 0 && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
+          <p className="mb-2 text-sm font-medium text-emerald-800 dark:text-emerald-300">
+            📄 {L("Export this report — links stay clickable", "导出本报告（链接可点）")}
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button onClick={() => downloadDoc("md")}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">⬇ Markdown (.md)</button>
+            <button onClick={() => downloadDoc("pdf")}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">⬇ PDF</button>
+            <button onClick={() => downloadDoc("html")}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">⬇ HTML (.html)</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
