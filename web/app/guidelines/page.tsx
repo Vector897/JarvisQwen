@@ -24,8 +24,8 @@ export default function Guidelines() {
         </p>
         <p className="text-sm text-slate-600">
           {L(
-            "The table below summarizes how JarvisQwen differs from conversational AI assistants (such as Doubao or DeepSeek):",
-            "下表概括了 JarvisQwen 与对话式 AI 助手（如豆包、DeepSeek）的差异："
+            "The table below summarizes how JarvisQwen differs from conversational AI assistants (such as ChatGPT or DeepSeek):",
+            "下表概括了 JarvisQwen 与对话式 AI 助手（如 ChatGPT、DeepSeek）的差异："
           )}
         </p>
         <div className="overflow-x-auto">
