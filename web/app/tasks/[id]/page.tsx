@@ -19,6 +19,18 @@ const NODE_COLOR: Record<string, string> = {
   pending: "#cbd5e1",
 };
 
+// Render plain-text artifact content, turning http(s) URLs into clickable links.
+function linkify(text: string) {
+  return text.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
+    /^https?:\/\//.test(part) ? (
+      <a key={i} href={part} target="_blank" rel="noopener noreferrer"
+        className="text-blue-600 underline break-all hover:text-blue-700">{part}</a>
+    ) : (
+      part
+    )
+  );
+}
+
 export default function TaskDetail() {
   const { id } = useParams<{ id: string }>();
   const [task, setTask] = useState<any>(null);
@@ -58,6 +70,38 @@ export default function TaskDetail() {
     }
     scrollToEl("artifacts");
   };
+
+  // Assemble the task + its artifacts into a downloadable document (client-side, no deps).
+  function buildDoc(fmt: "md" | "html") {
+    const title = task.title || task.type;
+    const meta = `Type: ${task.type} · Status: ${task.status}` +
+      (task.finished_at ? ` · Finished: ${fmtTime(task.finished_at)}` : "");
+    if (fmt === "md") {
+      let s = `# ${title}\n\n${meta}\n\n## Artifacts\n\n`;
+      for (const a of task.artifacts)
+        s += `### ${a.name} · ${a.step} · ${fmtTime(a.ts)}\n\n\`\`\`\n${a.content}\n\`\`\`\n\n`;
+      return { text: s, mime: "text/markdown", ext: "md" };
+    }
+    const esc = (x: string) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    let b = `<h1>${esc(title)}</h1><p>${esc(meta)}</p>`;
+    for (const a of task.artifacts)
+      b += `<h3>${esc(a.name)} · ${esc(a.step)} · ${esc(fmtTime(a.ts))}</h3>` +
+        `<pre style="white-space:pre-wrap;background:#f6f8fa;padding:12px;border-radius:8px;overflow:auto">${esc(a.content)}</pre>`;
+    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title></head>` +
+      `<body style="font-family:system-ui,sans-serif;max-width:820px;margin:2rem auto;padding:0 1rem;line-height:1.5">${b}</body></html>`;
+    return { text: html, mime: "text/html", ext: "html" };
+  }
+  function downloadDoc(fmt: "md" | "html") {
+    const { text, mime, ext } = buildDoc(fmt);
+    const url = URL.createObjectURL(new Blob([text], { type: `${mime};charset=utf-8` }));
+    const el = document.createElement("a");
+    el.href = url;
+    el.download = `${(task.title || task.type).replace(/[^\w一-龥-]+/g, "_").slice(0, 60) || "task"}.${ext}`;
+    document.body.appendChild(el);
+    el.click();
+    el.remove();
+    URL.revokeObjectURL(url);
+  }
 
   const nodes: Node[] = task.pipeline.map((s: any, i: number) => ({
     id: String(i),
@@ -139,10 +183,18 @@ export default function TaskDetail() {
         </div>
       )}
 
-      <h2 id="artifacts" className="scroll-mt-4 text-lg font-semibold">
-        {t("taskDetail.artifacts")}
-        {task.artifacts.length > 0 ? ` · ${task.artifacts.length}` : ""}
-      </h2>
+      <div id="artifacts" className="flex scroll-mt-4 flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold">
+          {t("taskDetail.artifacts")}
+          {task.artifacts.length > 0 ? ` · ${task.artifacts.length}` : ""}
+        </h2>
+        {task.artifacts.length > 0 && (
+          <div className="flex gap-2">
+            <button onClick={() => downloadDoc("md")} className="btn-ghost text-xs">⬇ .md</button>
+            <button onClick={() => downloadDoc("html")} className="btn-ghost text-xs">⬇ .html</button>
+          </div>
+        )}
+      </div>
       <div className="space-y-2">
         {task.artifacts.map((a: any, i: number) => (
           <details key={i} id={`artifact-${i}`} className="card scroll-mt-4" open={i === 0}>
@@ -150,7 +202,7 @@ export default function TaskDetail() {
               {a.name} <span className="text-xs text-slate-400">· {a.step} · {fmtTime(a.ts)}</span>
             </summary>
             <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap text-xs text-slate-700">
-              {a.content}
+              {linkify(a.content)}
             </pre>
           </details>
         ))}
