@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 
-/** Public landing page (no login required): privacy notice at the top → manifesto → mission → author & repository.
- *  Standalone dark canvas (nav/topbar are not rendered on /home), styled to match the logo. */
+/** Public landing page (no login required): logo hero → privacy notice → mission → zen → author.
+ *  Light by default, theme-aware (dark: variants), full-width responsive layout. */
 
 const REPO = "https://github.com/Vector897/JarvisQwen";
 
@@ -22,87 +22,88 @@ const ZEN: [string, string][] = [
 
 export default function Home() {
   return (
-    <div className="mx-auto max-w-3xl">
-      <div className="overflow-hidden rounded-3xl bg-[#05070d] text-slate-200 shadow-2xl ring-1 ring-slate-800">
-        {/* Hero */}
-        <div className="flex flex-col items-center px-6 pt-12 text-center">
-          <h1 className="text-5xl font-extrabold tracking-tight drop-shadow-[0_0_25px_rgba(56,189,248,0.35)] sm:text-6xl">
-            <span className="text-sky-400">Jarvis</span>
-            <span className="text-white">Qwen</span>
-          </h1>
-          <p className="mt-3 text-sm tracking-widest text-sky-400/80">YOUR 24/7 AI BUTLER · POWERED BY QWEN</p>
-
-          {/* CTA — moved to the line below JarvisQwen */}
-          <div className="mt-7 flex flex-wrap justify-center gap-3">
-            <Link href="/dashboard"
-              className="rounded-xl bg-sky-500 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-400">
-              Quick Try →
-            </Link>
-            <Link href="/deploy"
-              className="rounded-xl border border-slate-700 px-6 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-sky-500 hover:text-sky-400">
-              🚀 Deploy your own
-            </Link>
-            <a href={REPO} target="_blank" rel="noreferrer"
-              className="rounded-xl border border-slate-700 px-6 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-sky-500 hover:text-sky-400">
-              ⭐ GitHub
-            </a>
-          </div>
-        </div>
-
-        {/* Privacy notice — placed first */}
-        <div className="mx-6 mt-8 rounded-2xl border border-emerald-700/40 bg-emerald-950/40 p-5 text-sm leading-relaxed">
-          <p className="font-semibold text-emerald-300">🔒 Before anything else, know this:</p>
-          <p className="mt-2 text-emerald-100/90">
-            <b>JarvisQwen collects nothing about you. Ever.</b> There is no company server, no account,
-            no telemetry, no analytics. Everything — your documents, your API keys, your memories,
-            your briefings — lives on <b>your own computer</b> and talks only to <b>your own AI</b>,
-            with a key that <b>you</b> hold. Delete the folder and every trace is gone.
-          </p>
-          <p className="mt-2 text-xs text-emerald-200/60">
-            本项目不收集任何用户数据：没有厂商服务器、没有账号体系、没有埋点。你的文档、密钥、记忆与简报全部保存在你自己的电脑上，只与你自己的 AI 通信。删除文件夹，一切痕迹随之消失。
-          </p>
-        </div>
-
-        {/* Mission */}
-        <div className="px-8 py-10 text-center">
-          <h2 className="text-xl font-bold text-white">Why this exists</h2>
-          <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-slate-400">
-            The people who would benefit most from AI — researchers, analysts, doctors, lawyers,
-            small-business owners — are mostly not programmers. Today, using AI <i>well</i> still
-            means writing code, wiring APIs, and babysitting scripts. JarvisQwen is my answer:
-            an AI butler that anyone can run — <b>subscribe to what you care about once, and wake up
-            to what matters every morning</b>. No code. No babysitting. No surprise bills.
-          </p>
-        </div>
-
-        {/* The Zen */}
-        <div className="border-t border-slate-800/80 px-8 py-10">
-          <h2 className="text-center text-xl font-bold text-white">The Zen of JarvisQwen</h2>
-          <div className="mx-auto mt-6 max-w-xl space-y-4">
-            {ZEN.map(([en, zh], i) => (
-              <div key={i} className="text-center">
-                <p className="text-[15px] leading-6 text-slate-200">{en}</p>
-                <p className="text-xs text-slate-500">{zh}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Author & repository */}
-        <div className="border-t border-slate-800/80 px-8 py-8 text-center text-sm">
-          <p className="text-slate-400">
-            Built and actively maintained by{" "}
-            <a href="https://github.com/Vector897" target="_blank" rel="noreferrer"
-               className="font-semibold text-sky-400 hover:underline">@Vector897</a>.
-            I use it every day for my own research, and I will keep shipping — new sources,
-            new connectors, better memory. Star the repo to follow along, open an issue to shape it.
-          </p>
+    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      {/* Hero */}
+      <section className="flex flex-col items-center text-center">
+        <img src="/logo-icon.png" alt="JarvisQwen"
+          className="mb-5 h-24 w-24 rounded-3xl shadow-lg ring-1 ring-slate-200 dark:ring-slate-700" />
+        <h1 className="text-5xl font-extrabold tracking-tight sm:text-6xl">
+          <span className="text-sky-500">Jarvis</span>
+          <span className="text-slate-900 dark:text-white">Qwen</span>
+        </h1>
+        <p className="mt-3 text-sm font-medium tracking-widest text-sky-600/80 dark:text-sky-400/80">
+          YOUR 24/7 AI BUTLER · POWERED BY QWEN
+        </p>
+        <div className="mt-7 flex flex-wrap justify-center gap-3">
+          <Link href="/guidelines"
+            className="rounded-xl bg-sky-500 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-600">
+            Quick Try →
+          </Link>
+          <Link href="/deploy"
+            className="rounded-xl border border-slate-300 px-6 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-sky-500 hover:text-sky-600 dark:border-slate-700 dark:text-slate-200 dark:hover:text-sky-400">
+            🚀 Deploy your own
+          </Link>
           <a href={REPO} target="_blank" rel="noreferrer"
-             className="mt-3 inline-block font-mono text-xs text-slate-500 hover:text-sky-400">
-            {REPO}
+            className="rounded-xl border border-slate-300 px-6 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-sky-500 hover:text-sky-600 dark:border-slate-700 dark:text-slate-200 dark:hover:text-sky-400">
+            ⭐ GitHub
           </a>
         </div>
-      </div>
+      </section>
+
+      {/* Privacy notice */}
+      <section className="mx-auto mt-10 max-w-3xl rounded-2xl border border-emerald-300 bg-emerald-50 p-5 text-sm leading-relaxed dark:border-emerald-800/50 dark:bg-emerald-950/40">
+        <p className="font-semibold text-emerald-700 dark:text-emerald-300">🔒 Before anything else, know this:</p>
+        <p className="mt-2 text-emerald-900/90 dark:text-emerald-100/90">
+          <b>JarvisQwen collects nothing about you. Ever.</b> There is no company server, no account,
+          no telemetry, no analytics. Everything — your documents, your API keys, your memories,
+          your briefings — lives on <b>your own computer</b> and talks only to <b>your own AI</b>,
+          with a key that <b>you</b> hold. Delete the folder and every trace is gone.
+        </p>
+        <p className="mt-2 text-xs text-emerald-700/70 dark:text-emerald-200/60">
+          本项目不收集任何用户数据：没有厂商服务器、没有账号体系、没有埋点。你的文档、密钥、记忆与简报全部保存在你自己的电脑上，只与你自己的 AI 通信。删除文件夹，一切痕迹随之消失。
+        </p>
+      </section>
+
+      {/* Mission */}
+      <section className="mt-12 text-center">
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Why this exists</h2>
+        <p className="mx-auto mt-4 max-w-2xl text-[15px] leading-7 text-slate-600 dark:text-slate-400">
+          The people who would benefit most from AI — researchers, analysts, doctors, lawyers,
+          small-business owners — are mostly not programmers. Today, using AI <i>well</i> still
+          means writing code, wiring APIs, and babysitting scripts. JarvisQwen is my answer:
+          an AI butler that anyone can run — <b>subscribe to what you care about once, and wake up
+          to what matters every morning</b>. No code. No babysitting. No surprise bills.
+        </p>
+      </section>
+
+      {/* The Zen — two columns on desktop to use the width */}
+      <section className="mt-12 border-t border-slate-200 pt-10 dark:border-slate-800">
+        <h2 className="text-center text-2xl font-bold text-slate-900 dark:text-white">The Zen of JarvisQwen</h2>
+        <div className="mx-auto mt-6 grid max-w-4xl gap-4 sm:grid-cols-2">
+          {ZEN.map(([en, zh], i) => (
+            <div key={i}
+              className="rounded-xl border border-slate-200 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+              <p className="text-[15px] leading-6 text-slate-800 dark:text-slate-200">{en}</p>
+              <p className="mt-1 text-xs text-slate-500">{zh}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Author & repository */}
+      <section className="mt-12 border-t border-slate-200 pt-8 text-center text-sm dark:border-slate-800">
+        <p className="mx-auto max-w-2xl text-slate-600 dark:text-slate-400">
+          Built and actively maintained by{" "}
+          <a href="https://github.com/Vector897" target="_blank" rel="noreferrer"
+             className="font-semibold text-sky-600 hover:underline dark:text-sky-400">@Vector897</a>.
+          I use it every day for my own research, and I will keep shipping — new sources,
+          new connectors, better memory. Star the repo to follow along, open an issue to shape it.
+        </p>
+        <a href={REPO} target="_blank" rel="noreferrer"
+           className="mt-3 inline-block font-mono text-xs text-slate-500 hover:text-sky-500">
+          {REPO}
+        </a>
+      </section>
     </div>
   );
 }
