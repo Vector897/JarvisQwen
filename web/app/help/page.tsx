@@ -168,6 +168,22 @@ export default function Help() {
           {L(".", "中的常见问题。")}
         </p>
       </section>
+
+      {/* (6) Still stuck? — keep a way to reach a human */}
+      <section className="space-y-2">
+        <h2 className="text-lg font-bold">{L("Still have questions?", "还有问题？")}</h2>
+        <div className="card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-slate-600">
+            {L("Didn't find your answer above? Reach out — I'm a real person and happy to help.",
+               "上面没找到答案？欢迎直接联系我，真人回复，很乐意帮忙。")}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <a href="mailto:EIITF@outlook.com" className="btn-ghost text-sm">✉️ EIITF@outlook.com</a>
+            <a href="https://github.com/Vector897" target="_blank" rel="noopener noreferrer"
+              className="btn-ghost text-sm">🐙 GitHub</a>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
