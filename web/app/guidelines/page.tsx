@@ -18,8 +18,8 @@ export default function Guidelines() {
         <h2 className="text-lg font-bold">{L("1. Overview: what JarvisQwen is", "一、产品概述：JarvisQwen 是什么")}</h2>
         <p className="text-sm text-slate-600">
           {L(
-            "JarvisQwen is an AI research assistant that runs autonomously, 24/7, in the cloud. It is designed for work that needs continuous tracking rather than one-off answers: after you submit a task or subscribe to a topic once, the system automatically searches, filters, archives and summarizes new information on schedule, then organizes the results into a searchable library and a daily briefing. The system keeps running while your browser is closed and your computer is off.",
-            "JarvisQwen 是一个在云端 7×24 小时自主运行的 AI 研究助理，面向「需要持续跟踪」而非「一次性回答」的工作：你提交一个任务或订阅一个主题之后，系统会按计划自动完成检索、筛选、归档与总结，并把结果整理成可检索的知识库和每日简报。执行期间无需保持页面打开，你的电脑关机也不影响系统运行。"
+            "JarvisQwen is a self-hosted, 24/7 AI research butler for work that needs continuous tracking rather than one-off answers. You run it on your own machine — or a cheap always-on VM — and subscribe once to a topic; it then searches, triages, archives and summarizes new work on schedule, and organizes everything into a searchable library and a morning briefing (which you can export as Markdown, PDF or HTML). Because you host it yourself, it keeps working even when your own laptop is closed. It collects nothing about you — no company server, no account, no telemetry: your documents, keys, memories and briefings stay on your machine and talk only to your own AI (Qwen) with a key you hold. No code, no babysitting, no surprise bills.",
+            "JarvisQwen 是一个自托管、7×24 小时运行的 AI 研究管家，面向「需要持续跟踪」而非「一次性回答」的工作。你把它跑在自己的机器上（或一台便宜的常开云主机），订阅一个主题后，系统便按计划自动检索、初筛、归档、总结，并把结果整理成可检索的知识库与每日晨间简报（可导出为 Markdown / PDF / HTML）。因为是你自己托管，即使你的笔记本合上，它也照常运行。它不收集你的任何数据——没有厂商服务器、没有账号、没有埋点：你的文档、密钥、记忆与简报都留在你自己的机器上，只与你自己的 AI（Qwen）通信，用的是你自己持有的密钥。无需写代码、无需盯着、不会有意外账单。"
           )}
         </p>
         <p className="text-sm text-slate-600">
