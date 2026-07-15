@@ -99,6 +99,24 @@ export default function Connect() {
           </div>
         </section>
       </div>
+
+      {/* (3) Contact / follow — reach a real human */}
+      <section className="card space-y-3">
+        <h2 className="text-lg font-semibold">💬 {L("Have questions? Get in touch", "有问题？直接找我")}</h2>
+        <p className="text-sm text-slate-500">
+          {L("Didn't find your answer? I'm a real person — reach me on any of these.",
+             "没找到答案？真人回复，以下任意方式都能找到我。")}
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <a href="mailto:EIITF@outlook.com" className="btn-ghost text-center text-sm">✉️ EIITF@outlook.com</a>
+          <a href="https://github.com/Vector897" target="_blank" rel="noopener noreferrer"
+            className="btn-ghost text-center text-sm">🐙 GitHub</a>
+          <a href="https://devpost.com/aigc-vm-uk" target="_blank" rel="noopener noreferrer"
+            className="btn-ghost text-center text-sm">🏆 Devpost</a>
+          <a href="https://www.youtube.com/@OrionVector" target="_blank" rel="noopener noreferrer"
+            className="btn-ghost text-center text-sm">▶️ YouTube</a>
+        </div>
+      </section>
     </div>
   );
 }
