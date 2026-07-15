@@ -70,7 +70,10 @@ def step_fetch(ctx: TaskContext, state: dict) -> dict:
     state["found"] = found
     state["source"] = source
     unit = "papers" if source == "arxiv" else "news articles"
-    body = "\n".join(f"- {p['title']} ({p['published_at']})" for p in found) or "(no results)"
+    body = "\n".join(
+        f"- {p['title']} ({p['published_at']})" + (f"\n  {p['url']}" if p.get("url") else "")
+        for p in found
+    ) or "(no results)"
     ctx.artifact("Search results", f"[source: {source} · {len(found)} {unit}]\n{body}")
     return state
 
