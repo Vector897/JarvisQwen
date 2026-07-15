@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import current_user
 from ..core.engine.engine import REGISTRY, latest_checkpoint, step_durations
-from ..core.engine.task_templates import TEMPLATES, apply_template
+from ..core.engine.task_templates import apply_template, localized_templates
 from ..db import get_db
 from ..models import Task, User
 
@@ -29,8 +29,9 @@ class TaskIn(BaseModel):
 
 
 @router.get("/templates")
-def list_templates():
-    return TEMPLATES
+def list_templates(lang: str = "en"):
+    """Task templates for the picker. ``lang`` (en/zh) localizes the display strings."""
+    return localized_templates("zh" if lang == "zh" else "en")
 
 
 def _parse_prompt(prompt: str) -> tuple[str, dict, str]:

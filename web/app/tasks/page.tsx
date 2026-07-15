@@ -36,9 +36,13 @@ export default function Tasks() {
 
   const load = () => api("/api/tasks").then(setTasks).catch(() => {});
 
+  // Templates carry backend-provided display copy; re-fetch on language change so the picker follows the UI language.
+  useEffect(() => {
+    api(`/api/tasks/templates?lang=${lang}`).then(setTemplates).catch(() => {});
+  }, [lang]);
+
   useEffect(() => {
     load();
-    api("/api/tasks/templates").then(setTemplates).catch(() => {});
     return subscribe((type, ev) => {
       if (type === "task_progress") {
         setTasks((ts) => (ts || []).map((t) => t.id === ev.task_id
