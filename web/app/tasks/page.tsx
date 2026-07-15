@@ -94,12 +94,12 @@ export default function Tasks() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {templates.map((tpl) => (
           <button key={tpl.id} onClick={() => openTemplate(tpl)}
-            className="card-link px-3 py-2 text-left text-xs" style={{ minWidth: 150 }}>
+            className="card-link h-full px-3 py-2 text-left text-xs">
             <div className="font-medium">{tpl.name}</div>
-            <div className="text-slate-400">{tpl.description}</div>
+            <div className="mt-0.5 line-clamp-2 text-slate-400">{tpl.description}</div>
           </button>
         ))}
       </div>
