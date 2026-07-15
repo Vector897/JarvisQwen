@@ -97,7 +97,7 @@ export default function Guidelines() {
         <h2 className="text-lg font-bold">
           {L("3. Feature pages, in sidebar order", "三、功能页面说明（按侧边栏自上而下的顺序）")}
         </h2>
-        <div className="card space-y-3 text-sm">
+        <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
           <Feature icon="📖" name={L("Guidelines", "使用指南")}
             d={L(
               "This page. It introduces what the system does, how to get started, and what each page is for.",
@@ -245,12 +245,12 @@ function CmpRow({ k, a, b }: { k: string; a: string; b: string }) {
 
 function Feature({ icon, name, d }: { icon: string; name: string; d: string }) {
   return (
-    <div className="flex items-start gap-3">
-      <span className="mt-0.5 text-lg">{icon}</span>
-      <div>
+    <div className="card h-full">
+      <div className="flex items-center gap-2">
+        <span className="text-lg">{icon}</span>
         <span className="font-semibold">{name}</span>
-        <p className="text-slate-500">{d}</p>
       </div>
+      <p className="mt-1.5 text-xs text-slate-500">{d}</p>
     </div>
   );
 }
