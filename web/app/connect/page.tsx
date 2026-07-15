@@ -66,6 +66,12 @@ export default function Connect() {
               <p className="mt-2 text-xs opacity-70">{L("This page will show the QR code automatically once configured.", "配置完成后本页会自动显示二维码。")}</p>
             </div>
           )}
+          <p className="border-t border-slate-100 pt-3 text-xs text-slate-400 dark:border-slate-800">
+            {L(
+              "Channels today: Telegram (two-way) and email notifications. WhatsApp and Slack are on the roadmap.",
+              "当前支持的渠道：Telegram（可双向收发）与邮件通知。WhatsApp、Slack 等更多渠道已在路线图上。"
+            )}
+          </p>
         </section>
 
         {/* (2) GitHub repository */}
