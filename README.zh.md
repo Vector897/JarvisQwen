@@ -17,7 +17,7 @@
 - 🔒 **安全**:出境 PII 三层脱敏网关(正则/熵/NER,占位符替换回程还原)、提示注入隔离、append-only 审计日志
 - ✅ **人类在环**:高危操作进审批队列,批准后从检查点无缝继续
 - 🧠 **记忆系统**:情节记忆 → 夜间低峰整合为语义记忆;你标记"重要/忽略"的反馈回流优化后续初筛
-- 📱 **随处可用**:响应式 PWA 控制台(React Flow 流水线视图 + 预算仪表盘 + 审批 + 审计),中英双语,深色模式
+- 📱 **随处可用**:响应式 PWA 控制台(React Flow 流水线视图,可点节点跳转产出物 + 结果中来源可点链接 + 一键导出报告 Markdown/PDF/HTML + 预算仪表盘 + 审批 + 审计),中英双语,深色模式
 
 ## 快速开始
 
@@ -40,7 +40,7 @@ npm install && npm run dev                # http://localhost:3000
 curl -fsSL https://raw.githubusercontent.com/Vector897/JarvisQwen/main/install.sh | bash
 ```
 
-浏览器打开 `http://<ECS IP>:3000` → 点 **Quick Try** 免登录进入控制台(单机单用户模式)→ 设置页粘贴 DASHSCOPE_API_KEY → 订阅页添加研究关键词。安全组只需放行 TCP **22、3000**:后端 8000 仅绑本机回环、不对公网暴露,且默认开启入站 IP 限流(每 IP 240 次/分钟,可用 `AAOS_RATELIMIT_RPM` 调整)。所有状态在 `./data` 目录,迁移 = 拷贝 + compose up。
+浏览器打开 `http://<ECS IP>`(同时也监听 `:3000`)→ 点 **Quick Try** 免登录进入控制台(单机单用户模式)→ 设置页粘贴 DASHSCOPE_API_KEY → 订阅页添加研究关键词。安全组放行 TCP **22、80、3000**(80 端口给出更干净的 URL,还能穿过部分封 `:3000` 出站的网络,如某些校园网):后端 8000 仅绑本机回环、不对公网暴露,且默认开启入站 IP 限流(每 IP 240 次/分钟,可用 `AAOS_RATELIMIT_RPM` 调整)。所有状态在 `./data` 目录,迁移 = 拷贝 + compose up。
 
 ## 架构
 
